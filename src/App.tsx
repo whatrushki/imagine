@@ -5,13 +5,14 @@ import { CreationStudio } from './components/CreationStudio';
 import { QueueTable } from './components/QueueTable';
 import { ResultsFeed } from './components/ResultsFeed';
 import { LightboxModal } from './components/LightboxModal';
-import { PhotoItem, PromptItem, MatrixTask, GenerationSettings, SessionItem } from './types';
+import { PhotoItem, MatrixTask, GenerationSettings, SessionItem } from './types';
 import { generateImage, resetGradioClient } from './lib/booguClient';
 import { sanitizeFilename } from './lib/utils';
 import {
   cacheImageBlob,
   getCachedImageBlob,
   exportImageToGallery,
+  clearGeneratedCache,
   saveInputPhotos,
   loadInputPhotos,
   saveSourcePhotos,
@@ -38,7 +39,6 @@ export const App: React.FC = () => {
   const [activeView, setActiveView] = useState<'studio' | 'queue' | 'gallery'>('studio');
 
   const [photos, setPhotos] = useState<PhotoItem[]>([]);
-  const [prompts, setPrompts] = useState<PromptItem[]>([]);
   const [settings, setSettings] = useState<GenerationSettings>(defaultSettings);
 
   const [tasks, setTasks] = useState<MatrixTask[]>([]);
@@ -58,26 +58,90 @@ export const App: React.FC = () => {
   // Persistent cache of source photos across batches
   const sourcePhotosMapRef = useRef<Map<string, PhotoItem>>(new Map());
 
-  const photosRef = useRef<PhotoItem[]>([]);
-  useEffect(() => {
-    photosRef.current = photos;
-  }, [photos]);
-
+  // References for async worker loop
   const tasksRef = useRef<MatrixTask[]>([]);
-  useEffect(() => {
-    tasksRef.current = tasks;
-  }, [tasks]);
+  tasksRef.current = tasks;
+
+  const photosRef = useRef<PhotoItem[]>([]);
+  photosRef.current = photos;
+
+  const isRunningRef = useRef(isRunning);
+  isRunningRef.current = isRunning;
 
   const activeQueueRef = useRef<string[]>([]);
-  const isWorkerLoopRunningRef = useRef<boolean>(false);
   const stopSignalRef = useRef(false);
+  const isWorkerLoopRunningRef = useRef(false);
 
+  // 1. Load persisted data on mount (IndexedDB + LocalStorage)
   useEffect(() => {
-    window.addEventListener('beforeinstallprompt', (e: any) => {
+    let isCancelled = false;
+
+    async function hydrate() {
+      try {
+        // Load settings & sessions
+        const savedSettings = await getAppState<GenerationSettings>('settings', defaultSettings);
+        const savedSessions = await getAppState<SessionItem[]>('sessions', []);
+
+        // Load permanent source photos map
+        const sourceMap = await loadAllSourcePhotos();
+        sourcePhotosMapRef.current = sourceMap;
+
+        // Load input photos
+        const savedPhotos = await loadInputPhotos();
+        for (const p of savedPhotos) {
+          sourcePhotosMapRef.current.set(p.id, p);
+        }
+
+        // Load queue tasks
+        const savedTasks = await loadQueueTasks();
+
+        if (!isCancelled) {
+          setSettings(savedSettings);
+          setSessions(savedSessions);
+          setPhotos(savedPhotos);
+          setTasks(savedTasks);
+          tasksRef.current = savedTasks;
+          setIsHydrated(true);
+
+          if (window.innerWidth < 1024) {
+            setSidebarOpen(false);
+          }
+        }
+      } catch (err) {
+        console.error('Failed to hydrate state:', err);
+        if (!isCancelled) setIsHydrated(true);
+      }
+    }
+
+    hydrate();
+
+    const handleBeforeInstallPrompt = (e: Event) => {
       e.preventDefault();
       setDeferredPrompt(e);
-    });
+    };
+    window.addEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
+
+    return () => {
+      isCancelled = true;
+      window.removeEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
+    };
   }, []);
+
+  // 2. Persist state changes
+  useEffect(() => {
+    if (!isHydrated) return;
+    saveInputPhotos(photos);
+  }, [photos, isHydrated]);
+
+  useEffect(() => {
+    if (!isHydrated) return;
+    saveAppState('settings', settings);
+  }, [settings, isHydrated]);
+
+  useEffect(() => {
+    if (!isHydrated) return;
+    saveAppState('sessions', sessions);
+  }, [sessions, isHydrated]);
 
   const handleInstallPwa = async () => {
     if (!deferredPrompt) return;
@@ -88,97 +152,22 @@ export const App: React.FC = () => {
     }
   };
 
-  // Restore state from IndexedDB & LocalStorage on mount
-  useEffect(() => {
-    let isMounted = true;
-    async function hydrate() {
-      try {
-        const [savedPhotos, savedPrompts, savedSettings, savedView, savedTasks, sourcePhotosMap] = await Promise.all([
-          loadInputPhotos(),
-          getAppState<PromptItem[]>('prompts', []),
-          getAppState<GenerationSettings>('settings', defaultSettings),
-          getAppState<'studio' | 'queue' | 'gallery'>('activeView', 'studio'),
-          loadQueueTasks(),
-          loadAllSourcePhotos(),
-        ]);
-
-        if (!isMounted) return;
-
-        if (sourcePhotosMap) {
-          for (const [k, v] of sourcePhotosMap.entries()) {
-            sourcePhotosMapRef.current.set(k, v);
-          }
-        }
-
-        if (savedPhotos && savedPhotos.length > 0) {
-          setPhotos(savedPhotos);
-          photosRef.current = savedPhotos;
-          for (const p of savedPhotos) {
-            sourcePhotosMapRef.current.set(p.id, p);
-          }
-        }
-        if (savedPrompts && savedPrompts.length > 0) setPrompts(savedPrompts);
-        if (savedSettings) setSettings(savedSettings);
-        if (savedView) setActiveView(savedView);
-        if (savedTasks && savedTasks.length > 0) {
-          setTasks(savedTasks);
-          tasksRef.current = savedTasks;
-        }
-      } catch (e) {
-        console.warn('Hydration notice:', e);
-      } finally {
-        if (isMounted) setIsHydrated(true);
-      }
-    }
-    hydrate();
-    return () => {
-      isMounted = false;
-    };
-  }, []);
-
-  // Auto-save draft photos to IndexedDB
-  useEffect(() => {
-    if (!isHydrated) return;
-    saveInputPhotos(photos);
-  }, [photos, isHydrated]);
-
-  // Auto-save prompts
-  useEffect(() => {
-    if (!isHydrated) return;
-    saveAppState('prompts', prompts);
-  }, [prompts, isHydrated]);
-
-  // Auto-save settings
-  useEffect(() => {
-    if (!isHydrated) return;
-    saveAppState('settings', settings);
-  }, [settings, isHydrated]);
-
-  // Auto-save active view
-  useEffect(() => {
-    if (!isHydrated) return;
-    saveAppState('activeView', activeView);
-  }, [activeView, isHydrated]);
-
-  // Auto-save tasks to IndexedDB (debounced)
-  useEffect(() => {
-    if (!isHydrated) return;
-    const timer = setTimeout(() => {
-      saveQueueTasks(tasks);
-    }, 250);
-    return () => clearTimeout(timer);
-  }, [tasks, isHydrated]);
-
-  // Photo handlers
   const handleAddPhotos = (files: File[]) => {
     const newItems: PhotoItem[] = files.map((file) => ({
-      id: `${file.name}_${file.size}_${Date.now()}_${Math.random()}`,
+      id: `photo_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
       name: file.name,
       size: file.size,
       dataUrl: URL.createObjectURL(file),
       file,
     }));
-    setPhotos((prev) => [...prev, ...newItems]);
+
+    setPhotos((prev) => {
+      const updated = [...prev, ...newItems];
+      for (const item of updated) {
+        sourcePhotosMapRef.current.set(item.id, item);
+      }
+      return updated;
+    });
   };
 
   const handleRemovePhoto = (id: string) => {
@@ -189,79 +178,70 @@ export const App: React.FC = () => {
     setPhotos([]);
   };
 
-  // Prompt handlers
-  const handleAddPrompt = (text: string) => {
-    if (prompts.some((p) => p.text === text)) return;
-    setPrompts((prev) => [
-      ...prev,
-      { id: `${Date.now()}_${Math.random()}`, text },
-    ]);
-  };
-
-  const handleAddBulkPrompts = (texts: string[]) => {
-    const newItems: PromptItem[] = texts
-      .filter((t) => !prompts.some((p) => p.text === t))
-      .map((t) => ({ id: `${Date.now()}_${Math.random()}`, text: t }));
-    setPrompts((prev) => [...prev, ...newItems]);
-  };
-
-  const handleRemovePrompt = (id: string) => {
-    setPrompts((prev) => prev.filter((p) => p.id !== id));
-  };
-
-  const handleClearPrompts = () => {
-    setPrompts([]);
-  };
-
-  // New Generation
   const handleNewGeneration = () => {
     setActiveView('studio');
+    if (window.innerWidth < 1024) {
+      setSidebarOpen(false);
+    }
   };
 
-  // Core Runner Engine (Processes activeQueueRef)
+  const updateTaskStatus = (
+    taskId: string,
+    updates: Partial<MatrixTask>,
+    resultBlob?: Blob
+  ) => {
+    setTasks((prev) => {
+      const updated = prev.map((t) => (t.id === taskId ? { ...t, ...updates } : t));
+      tasksRef.current = updated;
+      saveQueueTasks(updated);
+      return updated;
+    });
+
+    if (resultBlob) {
+      cacheImageBlob(taskId, resultBlob);
+    }
+  };
+
+  // Central Generator Engine (Worker Loop with Exponential Backoff Retry)
   const runWorkerEngine = async () => {
     if (isWorkerLoopRunningRef.current) return;
     isWorkerLoopRunningRef.current = true;
-    setIsRunning(true);
     stopSignalRef.current = false;
+    setIsRunning(true);
 
-    // Start background persistence (Wake Lock, Silent Audio for iOS/Android, Heartbeat Worker)
-    await backgroundRunner.start();
+    try {
+      await backgroundRunner.start();
+    } catch (e) {
+      console.warn('Background runner start warn:', e);
+    }
 
-    const workerCount = Math.max(1, settings.workers);
+    const workerCount = Math.max(1, Math.min(3, settings.workers || 1));
 
-    const runWorker = async () => {
-      while (activeQueueRef.current.length > 0 && !stopSignalRef.current) {
+    const worker = async (workerIndex: number) => {
+      while (!stopSignalRef.current) {
         const taskId = activeQueueRef.current.shift();
         if (!taskId) break;
 
-        const task = tasksRef.current.find((t) => t.id === taskId);
-        if (!task) continue;
+        const currentTask = tasksRef.current.find((t) => t.id === taskId);
+        if (!currentTask) continue;
 
-        let photo = sourcePhotosMapRef.current.get(task.photoId);
+        let photo = sourcePhotosMapRef.current.get(currentTask.photoId);
         if (!photo) {
-          photo =
-            photosRef.current.find((p) => p.id === task.photoId) ||
-            photos.find((p) => p.id === task.photoId);
+          photo = photosRef.current.find((p) => p.id === currentTask.photoId);
         }
-        if (!photo) {
-          const allSources = await loadAllSourcePhotos();
-          for (const [k, v] of allSources.entries()) {
-            sourcePhotosMapRef.current.set(k, v);
-          }
-          photo = sourcePhotosMapRef.current.get(task.photoId);
-        }
-        if (!photo) {
-          console.error(`Photo not found for task ${task.id}`);
+
+        if (!photo || !photo.file) {
+          updateTaskStatus(taskId, {
+            status: 'error',
+            error: 'Исходный файл фото не найден',
+          });
           continue;
         }
 
-        // Set status to processing
-        setTasks((prev) =>
-          prev.map((t) =>
-            t.id === taskId ? { ...t, status: 'processing', error: undefined } : t
-          )
-        );
+        updateTaskStatus(taskId, {
+          status: 'processing',
+          error: undefined,
+        });
 
         try {
           const seed = settings.randomSeed
@@ -270,112 +250,84 @@ export const App: React.FC = () => {
 
           const { resultUrl, duration } = await generateImage(
             photo.file,
-            task.promptText,
+            currentTask.promptText,
             settings.resolution,
             seed,
             settings.thinking
           );
 
-          setTasks((prev) =>
-            prev.map((t) =>
-              t.id === taskId
-                ? { ...t, status: 'success', resultUrl, duration, failCount: 0, error: undefined }
-                : t
-            )
-          );
+          updateTaskStatus(taskId, {
+            status: 'success',
+            resultUrl,
+            duration,
+            failCount: 0,
+            error: undefined,
+          });
 
-          // Silently cache generated image blob inside internal storage
           try {
             const resp = await fetch(resultUrl);
             const blob = await resp.blob();
             await cacheImageBlob(taskId, blob);
-          } catch (storageErr) {
-            console.warn('Silent cache notice:', storageErr);
+          } catch (e) {
+            console.warn('Cache error:', e);
           }
         } catch (err: any) {
-          console.error(`Task ${taskId} failed:`, err);
-          // In case connection dropped during sleep/background, reset Gradio client for clean reconnect
-          resetGradioClient();
+          const errMsg = err?.message || 'Ошибка генерации';
+          console.error(`Task ${taskId} failed:`, errMsg);
 
-          const newFailCount = (task.failCount || 0) + 1;
-          const MAX_RETRIES = 5;
+          const failCount = (currentTask.failCount || 0) + 1;
 
-          const errMsg = err?.message || String(err || '');
-          const isRateLimit =
-            errMsg.includes('Only one request is permitted') ||
-            errMsg.includes('429') ||
-            errMsg.includes('rate limit') ||
-            errMsg.includes('queue');
+          if (failCount < 5 && !stopSignalRef.current) {
+            const backoffMs = Math.min(12000, 2000 * Math.pow(1.5, failCount - 1));
 
-          if (newFailCount <= MAX_RETRIES && !stopSignalRef.current) {
-            // Gradio demo rate limit requires waiting 6..14 seconds before the next query
-            const backoffSec = isRateLimit
-              ? Math.min(15, 4 + newFailCount * 2)
-              : Math.min(10, 2 + newFailCount * 2);
+            updateTaskStatus(taskId, {
+              status: 'requeued',
+              failCount,
+              error: `${errMsg}. Повтор через ${(backoffMs / 1000).toFixed(0)}с (${failCount}/5)`,
+            });
 
-            const statusMsg = isRateLimit
-              ? `Рейт-лимит демо (пауза ${backoffSec}с, попытка ${newFailCount}/${MAX_RETRIES})`
-              : `Сбой (${errMsg.slice(0, 40)}). Повтор через ${backoffSec}с (${newFailCount}/${MAX_RETRIES})`;
+            resetGradioClient();
 
-            setTasks((prev) =>
-              prev.map((t) =>
-                t.id === taskId
-                  ? { ...t, status: 'requeued', failCount: newFailCount, error: statusMsg }
-                  : t
-              )
-            );
-
-            // Wait backoff delay
-            await new Promise((r) => setTimeout(r, backoffSec * 1000));
-
-            if (!stopSignalRef.current) {
-              activeQueueRef.current.push(taskId);
-            }
+            setTimeout(() => {
+              if (!stopSignalRef.current) {
+                activeQueueRef.current.push(taskId);
+                if (!isWorkerLoopRunningRef.current) {
+                  runWorkerEngine();
+                }
+              }
+            }, backoffMs);
           } else {
-            // Max retries exhausted
-            setTasks((prev) =>
-              prev.map((t) =>
-                t.id === taskId
-                  ? {
-                      ...t,
-                      status: 'error',
-                      failCount: newFailCount,
-                      error: isRateLimit
-                        ? 'Сервер перегружен (исчерпано 5 попыток). Нажмите «Повторить» для ручного перезапуска.'
-                        : errMsg || 'Ошибка сервера',
-                    }
-                  : t
-              )
-            );
+            updateTaskStatus(taskId, {
+              status: 'error',
+              failCount,
+              error: errMsg,
+            });
           }
         }
 
-        if (settings.delay > 0 && !stopSignalRef.current && activeQueueRef.current.length > 0) {
-          await new Promise((r) => setTimeout(r, settings.delay * 1000));
+        if (settings.delay > 0 && !stopSignalRef.current) {
+          await new Promise((res) => setTimeout(res, settings.delay * 1000));
         }
       }
     };
 
-    const workerPromises = Array.from({ length: workerCount }, () => runWorker());
-    await Promise.all(workerPromises);
+    const workers = Array.from({ length: workerCount }, (_, i) => worker(i + 1));
+    await Promise.all(workers);
 
-    isWorkerLoopRunningRef.current = false;
-    setIsRunning(false);
-    backgroundRunner.stop();
+    if (activeQueueRef.current.length === 0) {
+      setIsRunning(false);
+      isWorkerLoopRunningRef.current = false;
+      backgroundRunner.stop();
+    }
   };
 
-  // Re-run or trigger single task
   const handleRegenerateById = (taskId: string) => {
-    const task = tasksRef.current.find((t) => t.id === taskId);
-    if (!task) return;
-
-    setTasks((prev) =>
-      prev.map((t) =>
-        t.id === taskId
-          ? { ...t, status: 'pending', error: undefined, failCount: 0, resultUrl: null }
-          : t
-      )
-    );
+    updateTaskStatus(taskId, {
+      status: 'pending',
+      resultUrl: null,
+      error: undefined,
+      failCount: 0,
+    });
 
     if (isWorkerLoopRunningRef.current) {
       if (!activeQueueRef.current.includes(taskId)) {
@@ -387,82 +339,88 @@ export const App: React.FC = () => {
     }
   };
 
-  // Start or Append to Queue (Non-blocking: creates new batch without deleting previous tasks)
-  const startQueue = async () => {
-    // 1. If there are photos and prompts on the main page, create a new batch!
-    if (photos.length > 0 && prompts.length > 0) {
-      // Cache source photos into permanent storage and memory ref
-      await saveSourcePhotos(photos);
-      for (const p of photos) {
-        sourcePhotosMapRef.current.set(p.id, p);
-      }
+  // Launch a new batch: Single prompt + multiple photos immediately sent to queue!
+  const handleStartBatch = async (promptText: string) => {
+    if (photos.length === 0 || !promptText.trim()) return;
 
-      const batchId = `batch_${Date.now()}`;
-      const newBatchTasks: MatrixTask[] = [];
-      let idx = tasksRef.current.length;
-
-      prompts.forEach((prompt) => {
-        photos.forEach((photo) => {
-          newBatchTasks.push({
-            id: `${photo.id}_${prompt.id}_${Date.now()}_${idx}`,
-            index: idx,
-            batchId,
-            photoId: photo.id,
-            photoName: photo.name,
-            photoDataUrl: photo.dataUrl,
-            promptId: prompt.id,
-            promptText: prompt.text,
-            status: 'pending',
-            resultUrl: null,
-            failCount: 0,
-          });
-          idx++;
-        });
-      });
-
-      // Append new batch tasks to existing tasks
-      const updatedTasks = [...tasksRef.current, ...newBatchTasks];
-      setTasks(updatedTasks);
-      tasksRef.current = updatedTasks;
-      saveQueueTasks(updatedTasks);
-
-      // Append task IDs to worker active queue
-      const newIds = newBatchTasks.map((t) => t.id);
-      activeQueueRef.current.push(...newIds);
-
-      // REQUIREMENT 1: CLEAR THE MAIN PAGE!
-      setPhotos([]);
-      photosRef.current = [];
-      setPrompts([]);
-
-      // Session history record
-      const sessId = `session-${Date.now()}`;
-      const newSession: SessionItem = {
-        id: sessId,
-        title: `${photos.length} фото • ${prompts[0]?.text.slice(0, 24) || 'Стили'}...`,
-        date: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-        photoCount: photos.length,
-        promptCount: prompts.length,
-        totalTasks: newBatchTasks.length,
-      };
-      setSessions((prev) => [newSession, ...prev]);
-      setCurrentSessionId(sessId);
-    } else {
-      // Resume existing pending/requeued/error tasks
-      const pendingIds = tasksRef.current
-        .filter((t) => t.status === 'pending' || t.status === 'requeued' || t.status === 'error')
-        .map((t) => t.id)
-        .filter((id) => !activeQueueRef.current.includes(id));
-
-      if (pendingIds.length > 0) {
-        activeQueueRef.current.push(...pendingIds);
-      }
+    // Cache source photos permanently
+    await saveSourcePhotos(photos);
+    for (const p of photos) {
+      sourcePhotosMapRef.current.set(p.id, p);
     }
+
+    const batchId = `batch_${Date.now()}`;
+    const newBatchTasks: MatrixTask[] = [];
+    let idx = tasksRef.current.length;
+
+    photos.forEach((photo) => {
+      newBatchTasks.push({
+        id: `${photo.id}_${Date.now()}_${idx}`,
+        index: idx,
+        batchId,
+        photoId: photo.id,
+        photoName: photo.name,
+        photoDataUrl: photo.dataUrl,
+        promptId: `p_${Date.now()}`,
+        promptText: promptText.trim(),
+        status: 'pending',
+        resultUrl: null,
+        failCount: 0,
+      });
+      idx++;
+    });
+
+    // Append new batch to tasks list without wiping old tasks
+    const updatedTasks = [...tasksRef.current, ...newBatchTasks];
+    setTasks(updatedTasks);
+    tasksRef.current = updatedTasks;
+    saveQueueTasks(updatedTasks);
+
+    // Append to active execution queue
+    const newIds = newBatchTasks.map((t) => t.id);
+    activeQueueRef.current.push(...newIds);
+
+    // Clear studio inputs on launch (ChatGPT pattern)
+    setPhotos([]);
+    photosRef.current = [];
+
+    // Save session record
+    const sessId = `session-${Date.now()}`;
+    const newSession: SessionItem = {
+      id: sessId,
+      title: `${newBatchTasks.length} фото • ${promptText.trim().slice(0, 24)}...`,
+      date: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+      photoCount: newBatchTasks.length,
+      promptCount: 1,
+      totalTasks: newBatchTasks.length,
+    };
+    const updatedSessions = [newSession, ...sessions];
+    setSessions(updatedSessions);
+    saveAppState('sessions', updatedSessions);
+    setCurrentSessionId(sessId);
 
     // Navigate to Queue view
     setActiveView('queue');
 
-    // If workers not running, start them!
+    // Run workers
+    if (!isWorkerLoopRunningRef.current) {
+      runWorkerEngine();
+    }
+  };
+
+  // Resume remaining pending tasks
+  const startQueue = () => {
+    const pendingIds = tasksRef.current
+      .filter((t) => t.status === 'pending' || t.status === 'requeued' || t.status === 'error')
+      .map((t) => t.id)
+      .filter((id) => !activeQueueRef.current.includes(id));
+
+    if (pendingIds.length > 0) {
+      activeQueueRef.current.push(...pendingIds);
+    }
+
+    setActiveView('queue');
+
     if (!isWorkerLoopRunningRef.current) {
       runWorkerEngine();
     }
@@ -503,7 +461,32 @@ export const App: React.FC = () => {
     saveQueueTasks([]);
   };
 
-  // Download or Export Single to Device Gallery
+  // Clear Gallery (removes completed items from gallery vault)
+  const handleClearGallery = async () => {
+    const remaining = tasksRef.current.filter((t) => t.status !== 'success');
+    setTasks(remaining);
+    tasksRef.current = remaining;
+    saveQueueTasks(remaining);
+    await clearGeneratedCache();
+  };
+
+  // Clear History Sessions
+  const handleClearHistory = () => {
+    setSessions([]);
+    setCurrentSessionId('');
+    saveAppState('sessions', []);
+  };
+
+  const handleDeleteSession = (sessId: string) => {
+    const updated = sessions.filter((s) => s.id !== sessId);
+    setSessions(updated);
+    saveAppState('sessions', updated);
+    if (currentSessionId === sessId) {
+      setCurrentSessionId('');
+    }
+  };
+
+  // Direct download to device gallery / storage
   const handleDownloadSingle = async (task: MatrixTask) => {
     if (!task.resultUrl) return;
     try {
@@ -515,10 +498,10 @@ export const App: React.FC = () => {
       }
       const photoStem = task.photoName.replace(/\.[^/.]+$/, '');
       const slug = sanitizeFilename(task.promptText);
-      const filename = `${photoStem}__p${task.index + 1}_${slug}.png`;
+      const filename = `${photoStem}__${slug}.png`;
       await exportImageToGallery(blob, filename, task.promptText);
     } catch (e) {
-      console.error('Gallery export error:', e);
+      console.error('Download error:', e);
     }
   };
 
@@ -534,7 +517,7 @@ export const App: React.FC = () => {
         const blob = await resp.blob();
         const photoStem = task.photoName.replace(/\.[^/.]+$/, '');
         const slug = sanitizeFilename(task.promptText);
-        const filename = `${photoStem}__p${task.index + 1}_${slug}.png`;
+        const filename = `${photoStem}__${slug}.png`;
         zip.file(filename, blob);
       } catch (e) {
         console.warn('Zip add fail:', e);
@@ -557,7 +540,7 @@ export const App: React.FC = () => {
 
   return (
     <div className="min-h-screen bg-pure-white text-graphite-ink flex flex-col font-sans">
-      {/* ChatGPT-style Sidebar */}
+      {/* Sidebar with history management */}
       <Sidebar
         isOpen={sidebarOpen}
         onToggle={() => setSidebarOpen(!sidebarOpen)}
@@ -570,6 +553,8 @@ export const App: React.FC = () => {
           setCurrentSessionId(id);
           setActiveView('gallery');
         }}
+        onClearHistory={handleClearHistory}
+        onDeleteSession={handleDeleteSession}
         totalTasksCount={tasks.length}
         resultsCount={successTasksCount}
         isRunning={isRunning}
@@ -583,14 +568,16 @@ export const App: React.FC = () => {
           sidebarOpen ? 'lg:pl-64' : 'lg:pl-16'
         }`}
       >
-        {/* Top Minimalist App Bar */}
-        <header className="h-14 border-b border-hairline bg-pure-white sticky top-0 z-30 px-4 flex items-center justify-between">
+        {/* Top App Bar with Safe Area Support for System Bars */}
+        <header
+          className="border-b border-hairline bg-pure-white sticky top-0 z-30 px-4 pt-safe flex items-center justify-between"
+          style={{ minHeight: 'calc(3.5rem + env(safe-area-inset-top, 0px))' }}
+        >
           <div className="flex items-center space-x-3">
-            {/* Show toggle button in header ONLY when sidebar is closed on mobile */}
             {!sidebarOpen && (
               <button
                 onClick={() => setSidebarOpen(true)}
-                className="p-1.5 rounded-[10px] text-mid-ash hover:text-graphite-ink hover:bg-hover-veil transition lg:hidden"
+                className="p-1.5 rounded-lg text-mid-ash hover:text-graphite-ink hover:bg-hover-veil transition lg:hidden"
                 title="Развернуть боковую панель"
               >
                 <Menu className="w-5 h-5" />
@@ -602,42 +589,42 @@ export const App: React.FC = () => {
                 ? 'Студия'
                 : activeView === 'queue'
                 ? 'Очередь генерации'
-                : 'Галерея результатов'}
+                : 'Галерея'}
             </span>
           </div>
 
           {/* Right Header Status */}
           <div className="flex items-center space-x-2 text-xs">
             {isRunning && (
-              <span className="inline-flex items-center gap-1.5 text-xs text-graphite-ink font-medium bg-sidebar-mist border border-hairline px-2.5 py-1 rounded-[10px] animate-pulse">
+              <span className="inline-flex items-center gap-1.5 text-xs text-graphite-ink font-medium bg-sidebar-mist border border-hairline px-2.5 py-1 rounded-full animate-pulse">
                 <span className="w-1.5 h-1.5 rounded-full bg-graphite-ink" />
-                Генерация в процессе...
+                Генерация...
               </span>
             )}
           </div>
         </header>
 
-        {/* Unfinished session resume alert banner */}
+        {/* Resume Session Banner */}
         {unfinishedTasksCount > 0 && successTasksCount > 0 && !isRunning && (
           <div className="bg-sidebar-mist border-b border-hairline px-4 py-2.5 flex items-center justify-between text-xs gap-3">
             <div className="flex items-center gap-2 text-graphite-ink min-w-0">
               <span className="w-2 h-2 rounded-full bg-amber-500 shrink-0 animate-pulse" />
               <span className="truncate">
-                Сессия сохранена: готово <strong>{successTasksCount}</strong>, осталось <strong>{unfinishedTasksCount}</strong>.
+                Готово <strong>{successTasksCount}</strong>, осталось <strong>{unfinishedTasksCount}</strong>.
               </span>
             </div>
             <button
               onClick={startQueue}
-              className="shrink-0 bg-graphite-ink hover:bg-ink-press text-pure-white px-3 py-1.5 rounded-lg font-medium transition text-xs flex items-center gap-1.5"
+              className="shrink-0 bg-graphite-ink hover:bg-ink-press text-pure-white px-3 py-1.5 rounded-full font-medium transition text-xs flex items-center gap-1.5"
             >
-              <span>Продолжить генерацию</span>
+              <span>Продолжить</span>
             </button>
           </div>
         )}
 
         {/* View Content */}
         <main
-          className={`flex-1 flex flex-col ${
+          className={`flex-1 flex flex-col pb-safe ${
             activeView === 'studio'
               ? 'p-0 overflow-hidden'
               : 'p-3 sm:p-6 md:p-8 overflow-y-auto'
@@ -649,14 +636,9 @@ export const App: React.FC = () => {
               onAddPhotos={handleAddPhotos}
               onRemovePhoto={handleRemovePhoto}
               onClearPhotos={handleClearPhotos}
-              prompts={prompts}
-              onAddPrompt={handleAddPrompt}
-              onAddBulkPrompts={handleAddBulkPrompts}
-              onRemovePrompt={handleRemovePrompt}
-              onClearPrompts={handleClearPrompts}
               settings={settings}
               onUpdateSettings={setSettings}
-              onStartGeneration={startQueue}
+              onStartBatch={handleStartBatch}
               isRunning={isRunning}
             />
           )}
@@ -688,12 +670,13 @@ export const App: React.FC = () => {
               onDownloadZip={handleDownloadZip}
               onDownloadSingle={handleDownloadSingle}
               onOpenLightbox={(t) => setLightboxTask(t)}
+              onClearGallery={handleClearGallery}
             />
           )}
         </main>
       </div>
 
-      {/* Lightbox Modal (Fullscreen Multi-photo browsing & Gallery export) */}
+      {/* Fullscreen Lightbox Modal */}
       {lightboxTask && (
         <LightboxModal
           tasks={tasks.filter((t) => t.resultUrl || t.status === 'success')}

@@ -322,32 +322,25 @@ export async function clearCurrentSession(): Promise<void> {
   } catch {}
 }
 
-/** Transfer image to phone gallery / download */
+/** Clear all cached generated images in IndexedDB */
+export async function clearGeneratedCache(): Promise<void> {
+  try {
+    const db = await openDB();
+    const tx = db.transaction(STORE_GENERATED, 'readwrite');
+    tx.objectStore(STORE_GENERATED).clear();
+    return new Promise((resolve) => {
+      tx.oncomplete = () => resolve();
+      tx.onerror = () => resolve();
+    });
+  } catch {}
+}
+
+/** Direct download to device gallery / files (never opens OS share panel) */
 export async function exportImageToGallery(
   blob: Blob,
   filename: string,
-  title = 'Imagine generation'
-): Promise<'shared' | 'downloaded' | 'cancelled'> {
-  const file = new File([blob], filename, { type: blob.type || 'image/png' });
-
-  if (
-    typeof navigator !== 'undefined' &&
-    typeof navigator.canShare === 'function' &&
-    navigator.canShare({ files: [file] })
-  ) {
-    try {
-      await navigator.share({
-        files: [file],
-        title,
-      });
-      return 'shared';
-    } catch (err: any) {
-      if (err.name === 'AbortError') {
-        return 'cancelled';
-      }
-    }
-  }
-
+  _title = 'Imagine generation'
+): Promise<'downloaded'> {
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
   a.href = url;
@@ -355,6 +348,6 @@ export async function exportImageToGallery(
   document.body.appendChild(a);
   a.click();
   document.body.removeChild(a);
-  setTimeout(() => URL.revokeObjectURL(url), 5000);
+  setTimeout(() => URL.revokeObjectURL(url), 10000);
   return 'downloaded';
 }

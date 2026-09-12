@@ -2,12 +2,10 @@ import React, { useState } from 'react';
 import {
   Download,
   RotateCw,
-  Maximize2,
-  Square,
-  AlertCircle,
   Plus,
-  Layers,
-  ArrowLeftRight,
+  Image as ImageIcon,
+  Trash2,
+  Maximize2,
 } from 'lucide-react';
 import { MatrixTask, PhotoItem } from '../types';
 
@@ -21,6 +19,7 @@ interface ResultsFeedProps {
   onDownloadZip: () => void;
   onDownloadSingle: (task: MatrixTask) => void;
   onOpenLightbox: (task: MatrixTask) => void;
+  onClearGallery?: () => void;
 }
 
 export const ResultsFeed: React.FC<ResultsFeedProps> = ({
@@ -33,308 +32,178 @@ export const ResultsFeed: React.FC<ResultsFeedProps> = ({
   onDownloadZip,
   onDownloadSingle,
   onOpenLightbox,
+  onClearGallery,
 }) => {
-  const [filter, setFilter] = useState<'all' | 'success' | 'error'>('all');
-  const [showingOriginalMap, setShowingOriginalMap] = useState<Record<string, boolean>>({});
+  const [showClearConfirm, setShowClearConfirm] = useState(false);
 
-  const total = tasks.length;
-  const completed = tasks.filter((t) => t.status === 'success' || t.status === 'error').length;
-  const successTasks = tasks.filter((t) => t.status === 'success');
-  const errorTasks = tasks.filter((t) => t.status === 'error');
-  const percent = total === 0 ? 0 : Math.round((completed / total) * 100);
-
-  const filteredTasks = tasks.filter((t) => {
-    if (filter === 'success') return t.status === 'success';
-    if (filter === 'error') return t.status === 'error';
-    return true;
-  });
-
-  const toggleOriginal = (taskId: string) => {
-    setShowingOriginalMap((prev) => ({ ...prev, [taskId]: !prev[taskId] }));
-  };
+  // Gallery is the permanent storage vault: show successful completed images
+  const successTasks = tasks.filter((t) => t.status === 'success' && t.resultUrl);
 
   return (
-    <div className="max-w-6xl mx-auto w-full pb-20 px-2 sm:px-4">
-      {/* Top Header & Controls (Flat, Modern, Borderless) */}
+    <div className="max-w-6xl mx-auto w-full pb-28 px-1 sm:px-4">
+      {/* Top Header & Actions (No progress bar as requested!) */}
       <div className="py-3 sm:py-4">
         <div className="flex items-center justify-between gap-3">
           <div>
             <h1 className="text-xl sm:text-2xl font-semibold tracking-tight text-graphite-ink">
-              Галерея результатов
+              Галерея
             </h1>
             <p className="text-xs text-mid-ash mt-0.5">
-              {total === 0
-                ? 'Нет сгенерированных изображений'
-                : isRunning
-                ? `Генерация: ${completed} из ${total} (${percent}%)`
-                : `${successTasks.length} готово`}
+              {successTasks.length === 0
+                ? 'Хранилище пусто'
+                : `${successTasks.length} сохранённых изображений (1.5K)`}
             </p>
           </div>
 
           {/* Action Buttons */}
           <div className="flex items-center gap-2 shrink-0">
-            {isRunning ? (
-              <button
-                onClick={onStop}
-                className="inline-flex items-center gap-1.5 bg-graphite-ink hover:bg-black text-pure-white text-xs font-medium px-3.5 py-1.5 rounded-full transition shadow-xs"
-              >
-                <Square className="w-3 h-3 fill-current" />
-                <span>Остановить</span>
-              </button>
-            ) : (
-              <button
-                onClick={onNewGeneration}
-                className="inline-flex items-center gap-1.5 bg-graphite-ink hover:bg-black text-pure-white text-xs font-medium px-3.5 py-1.5 rounded-full transition shadow-xs"
-              >
-                <Plus className="w-3.5 h-3.5" />
-                <span>Новая генерация</span>
-              </button>
-            )}
-
             {successTasks.length > 0 && (
               <button
                 onClick={onDownloadZip}
-                className="inline-flex items-center gap-1.5 border border-hairline hover:bg-hover-veil text-graphite-ink text-xs font-medium px-3.5 py-1.5 rounded-full transition"
-                title="Скачать все сгенерированные фото в ZIP"
+                className="inline-flex items-center gap-1.5 border border-hairline hover:bg-hover-veil text-graphite-ink text-xs font-medium px-3.5 py-1.5 rounded-full transition active:scale-95"
+                title="Скачать все в ZIP"
               >
                 <Download className="w-3.5 h-3.5" />
-                <span className="hidden sm:inline">ZIP</span>
-                <span>({successTasks.length})</span>
+                <span>ZIP ({successTasks.length})</span>
               </button>
             )}
+
+            {successTasks.length > 0 && onClearGallery && (
+              <>
+                {showClearConfirm ? (
+                  <div className="flex items-center gap-1.5 animate-in fade-in duration-150">
+                    <button
+                      onClick={() => {
+                        onClearGallery();
+                        setShowClearConfirm(false);
+                      }}
+                      className="text-xs font-semibold bg-red-600 hover:bg-red-700 text-pure-white px-3 py-1.5 rounded-full transition active:scale-95 shadow-xs"
+                    >
+                      Удалить все ({successTasks.length})
+                    </button>
+                    <button
+                      onClick={() => setShowClearConfirm(false)}
+                      className="text-xs text-mid-ash hover:text-graphite-ink px-2 py-1.5 rounded-lg transition"
+                    >
+                      Отмена
+                    </button>
+                  </div>
+                ) : (
+                  <button
+                    onClick={() => setShowClearConfirm(true)}
+                    className="inline-flex items-center gap-1 text-xs text-mid-ash hover:text-red-600 px-2.5 py-1.5 rounded-lg transition hover:bg-red-50"
+                    title="Очистить всю галерею"
+                  >
+                    <Trash2 className="w-3.5 h-3.5" />
+                    <span className="hidden sm:inline">Очистить галерею</span>
+                  </button>
+                )}
+              </>
+            )}
+
+            <button
+              onClick={onNewGeneration}
+              className="inline-flex items-center gap-1.5 bg-graphite-ink hover:bg-black text-pure-white text-xs font-medium px-3.5 py-1.5 rounded-full transition shadow-xs active:scale-95"
+            >
+              <Plus className="w-3.5 h-3.5" />
+              <span className="hidden sm:inline">Создать ещё</span>
+            </button>
           </div>
         </div>
-
-        {/* Hairline Progress Line */}
-        {total > 0 && (
-          <div className="w-full h-1 bg-sidebar-mist rounded-full overflow-hidden mt-3">
-            <div
-              className="bg-graphite-ink h-full transition-all duration-300 rounded-full"
-              style={{ width: `${percent}%` }}
-            />
-          </div>
-        )}
-
-        {/* Flat Filter Pills */}
-        {total > 0 && (
-          <div className="flex items-center gap-1.5 mt-3 overflow-x-auto no-scrollbar py-0.5">
-            <button
-              onClick={() => setFilter('all')}
-              className={`px-3 py-1 rounded-full text-xs font-medium transition shrink-0 ${
-                filter === 'all'
-                  ? 'bg-graphite-ink text-pure-white'
-                  : 'text-mid-ash hover:text-graphite-ink hover:bg-hover-veil'
-              }`}
-            >
-              Все ({tasks.length})
-            </button>
-            <button
-              onClick={() => setFilter('success')}
-              className={`px-3 py-1 rounded-full text-xs font-medium transition shrink-0 ${
-                filter === 'success'
-                  ? 'bg-graphite-ink text-pure-white'
-                  : 'text-mid-ash hover:text-graphite-ink hover:bg-hover-veil'
-              }`}
-            >
-              Готовые ({successTasks.length})
-            </button>
-            {errorTasks.length > 0 && (
-              <button
-                onClick={() => setFilter('error')}
-                className={`px-3 py-1 rounded-full text-xs font-medium transition shrink-0 ${
-                  filter === 'error'
-                    ? 'bg-red-600 text-pure-white'
-                    : 'text-red-500 hover:text-red-700 hover:bg-red-50'
-                }`}
-              >
-                Сбои ({errorTasks.length})
-              </button>
-            )}
-          </div>
-        )}
       </div>
 
       {/* Grid of Results */}
-      {filteredTasks.length === 0 ? (
-        <div className="bg-pure-white border border-hairline rounded-[10px] p-12 text-center text-mid-ash space-y-2">
-          <Layers className="w-10 h-10 mx-auto text-hollow" />
-          <p className="text-sm font-medium text-graphite-ink">Нет изображений для отображения</p>
-          <p className="text-xs text-mid-ash">
-            Перейдите во вкладку Студии и запустите генерацию, или проверьте вкладку Очереди.
-          </p>
+      {successTasks.length === 0 ? (
+        <div className="py-20 text-center space-y-3 border-t border-hairline">
+          <div className="w-12 h-12 rounded-2xl bg-sidebar-mist border border-hairline mx-auto flex items-center justify-center text-mid-ash">
+            <ImageIcon className="w-6 h-6 opacity-60" />
+          </div>
+          <div className="space-y-1">
+            <p className="text-sm font-semibold text-graphite-ink">В галерее пока ничего нет</p>
+            <p className="text-xs text-mid-ash max-w-sm mx-auto leading-relaxed">
+              Все сгенерированные фотографии автоматически сохраняются здесь по мере завершения в очереди.
+            </p>
+          </div>
+          <button
+            onClick={onNewGeneration}
+            className="inline-flex items-center gap-1.5 text-xs font-medium bg-graphite-ink text-pure-white px-4 py-2 rounded-full hover:bg-black transition active:scale-95 shadow-xs"
+          >
+            <Plus className="w-3.5 h-3.5" />
+            <span>Перейти в студию</span>
+          </button>
         </div>
       ) : (
         <>
-          {/* Mobile Grid: Pure square images without captions (Instagram / Photos style) */}
-          <div className="grid grid-cols-3 gap-1 sm:hidden">
-        {filteredTasks.map((task) => (
-          <div
-            key={`mobile-${task.id}`}
-            onClick={() => task.resultUrl && onOpenLightbox(task)}
-            className="aspect-square relative overflow-hidden bg-sidebar-mist cursor-pointer active:opacity-80 transition"
-          >
-            {task.status === 'processing' ? (
-              <div className="w-full h-full flex flex-col items-center justify-center p-2 text-center bg-sidebar-mist">
-                <span className="w-5 h-5 border-2 border-graphite-ink border-t-transparent rounded-full animate-spin" />
-              </div>
-            ) : task.status === 'requeued' ? (
-              <div className="w-full h-full flex items-center justify-center bg-sidebar-mist">
-                <RotateCw className="w-5 h-5 animate-spin text-mid-ash" />
-              </div>
-            ) : task.status === 'error' ? (
+          {/* Mobile Grid: 3-column square images edge-to-edge without clutter (Instagram/Photos style) */}
+          <div className="grid grid-cols-3 gap-1 sm:hidden border-t border-hairline pt-1">
+            {successTasks.map((task) => (
               <div
-                onClick={(e) => {
-                  e.stopPropagation();
-                  onRegenerateTask(task.id);
-                }}
-                className="w-full h-full flex flex-col items-center justify-center p-1 text-center bg-sidebar-mist"
+                key={`mobile-${task.id}`}
+                onClick={() => onOpenLightbox(task)}
+                className="aspect-square relative overflow-hidden bg-sidebar-mist cursor-pointer active:opacity-75 transition"
               >
-                <AlertCircle className="w-5 h-5 text-mid-ash" />
-                <span className="text-[9px] text-mid-ash mt-0.5">Сбой</span>
+                <img
+                  src={task.resultUrl!}
+                  alt=""
+                  className="w-full h-full object-cover"
+                  loading="lazy"
+                />
               </div>
-            ) : task.resultUrl ? (
-              <img
-                src={task.resultUrl}
-                alt=""
-                className="w-full h-full object-cover"
-                loading="lazy"
-              />
-            ) : (
-              <div className="w-full h-full bg-sidebar-mist" />
-            )}
+            ))}
           </div>
-        ))}
-      </div>
 
-      {/* Desktop / Tablet Grid: Detailed Cards with Prompts & Controls */}
-      <div className="hidden sm:grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
-        {filteredTasks.map((task) => {
-          const photo = photos.find((p) => p.id === task.photoId);
-          const isShowingOriginal = showingOriginalMap[task.id];
-
-          return (
-            <div
-              key={task.id}
-              className="bg-pure-white border border-hairline rounded-[10px] overflow-hidden flex flex-col transition group hover:border-mid-ash"
-            >
-              {/* Media Container */}
+          {/* Desktop / Tablet Grid: Clean minimal cards */}
+          <div className="hidden sm:grid sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 border-t border-hairline pt-4">
+            {successTasks.map((task) => (
               <div
-                onClick={() => task.resultUrl && onOpenLightbox(task)}
-                className="relative aspect-square bg-sidebar-mist flex items-center justify-center cursor-pointer overflow-hidden select-none"
+                key={task.id}
+                className="group relative aspect-square rounded-2xl overflow-hidden bg-sidebar-mist border border-hairline shadow-xs hover:shadow transition cursor-pointer select-none"
+                onClick={() => onOpenLightbox(task)}
               >
-                {task.status === 'processing' ? (
-                  <div className="flex flex-col items-center gap-2.5 text-graphite-ink text-xs">
-                    <span className="w-8 h-8 border-2 border-graphite-ink border-t-transparent rounded-full animate-spin" />
-                    <span className="font-medium animate-pulse">Генерация 1.5K...</span>
-                  </div>
-                ) : task.status === 'requeued' ? (
-                  <div className="flex flex-col items-center gap-2 text-graphite-ink text-xs text-center p-4">
-                    <RotateCw className="w-6 h-6 animate-spin text-mid-ash" />
-                    <span className="font-medium">Возвращено в очередь (повтор {task.failCount})...</span>
-                  </div>
-                ) : task.status === 'error' ? (
-                  <div className="flex flex-col items-center gap-2 text-graphite-ink text-xs text-center p-4">
-                    <AlertCircle className="w-7 h-7 text-mid-ash" />
-                    <span className="font-semibold">Сбой генерации</span>
-                    <p className="text-[11px] text-mid-ash line-clamp-2 max-w-xs">
-                      {task.error || 'Ошибка связи с сервером'}
-                    </p>
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        onRegenerateTask(task.id);
-                      }}
-                      className="mt-1 text-xs bg-graphite-ink text-pure-white px-3 py-1 rounded-[10px] font-medium"
-                    >
-                      Повторить
-                    </button>
-                  </div>
-                ) : task.resultUrl ? (
-                  <>
-                    <img
-                      src={isShowingOriginal && photo ? photo.dataUrl : task.resultUrl}
-                      alt="Preview"
-                      className="w-full h-full object-cover transition duration-300 group-hover:scale-105"
-                    />
-                    {/* Label badge (Original vs Result) */}
-                    <span className="absolute top-2 left-2 text-[10px] font-semibold bg-pure-white/90 backdrop-blur-sm text-graphite-ink px-2 py-0.5 rounded-[10px] border border-hairline">
-                      {isShowingOriginal ? 'Оригинал' : 'Результат (1.5K)'}
-                    </span>
-                  </>
-                ) : (
-                  <div className="text-xs text-mid-ash">Ожидание очереди...</div>
-                )}
+                <img
+                  src={task.resultUrl!}
+                  alt={task.promptText}
+                  className="w-full h-full object-cover group-hover:scale-103 transition duration-300"
+                  loading="lazy"
+                />
 
-                {/* Hover Actions Toolbar */}
-                {task.resultUrl && (
-                  <div className="absolute top-2 right-2 flex items-center space-x-1.5 opacity-0 group-hover:opacity-100 transition">
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        toggleOriginal(task.id);
-                      }}
-                      className="p-1.5 rounded-[10px] bg-pure-white/90 hover:bg-pure-white text-graphite-ink border border-hairline transition shadow-sm"
-                      title={isShowingOriginal ? 'Показать результат' : 'Показать оригинал'}
-                    >
-                      <ArrowLeftRight className="w-3.5 h-3.5" />
-                    </button>
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        onOpenLightbox(task);
-                      }}
-                      className="p-1.5 rounded-[10px] bg-pure-white/90 hover:bg-pure-white text-graphite-ink border border-hairline transition shadow-sm"
-                      title="На весь экран"
-                    >
-                      <Maximize2 className="w-3.5 h-3.5" />
-                    </button>
-                  </div>
-                )}
-              </div>
-
-              {/* Card Meta & Prompt */}
-              <div className="p-3.5 flex flex-col justify-between flex-1 bg-pure-white space-y-2.5">
-                <div>
-                  <div className="flex items-center justify-between text-[11px] text-mid-ash mb-1">
-                    <span className="truncate font-medium">{task.photoName}</span>
-                    {task.duration && (
-                      <span className="font-mono text-[10px] text-hollow">
-                        {task.duration.toFixed(1)}с
-                      </span>
-                    )}
-                  </div>
-                  <p className="text-xs text-graphite-ink line-clamp-2 leading-relaxed" title={task.promptText}>
-                    "{task.promptText}"
-                  </p>
-                </div>
-
-                {/* Card Bottom Actions */}
-                <div className="flex items-center justify-between pt-2 border-t border-hairline">
+                {/* Top Action Hover Overlay */}
+                <div className="absolute top-2 right-2 flex items-center gap-1.5 opacity-0 group-hover:opacity-100 transition z-10">
                   <button
-                    onClick={() => onRegenerateTask(task.id)}
-                    className="flex items-center gap-1.5 text-xs text-mid-ash hover:text-graphite-ink transition font-medium"
-                    title="Перегенерировать этот результат"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onDownloadSingle(task);
+                    }}
+                    className="p-2 rounded-full bg-black/70 hover:bg-black text-pure-white backdrop-blur-xs transition shadow active:scale-90"
+                    title="Скачать фото"
                   >
-                    <RotateCw className="w-3 h-3" />
-                    <span>Повторить</span>
+                    <Download className="w-3.5 h-3.5" />
                   </button>
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onOpenLightbox(task);
+                    }}
+                    className="p-2 rounded-full bg-black/70 hover:bg-black text-pure-white backdrop-blur-xs transition shadow active:scale-90"
+                    title="На весь экран"
+                  >
+                    <Maximize2 className="w-3.5 h-3.5" />
+                  </button>
+                </div>
 
-                  {task.resultUrl && (
-                    <button
-                      onClick={() => onDownloadSingle(task)}
-                      className="flex items-center gap-1 text-xs font-medium text-graphite-ink hover:underline transition"
-                      title="Сохранить в галерею"
-                    >
-                      <Download className="w-3.5 h-3.5" />
-                      <span>В галерею</span>
-                    </button>
-                  )}
+                {/* Bottom Prompt Caption Gradient */}
+                <div className="absolute bottom-0 inset-x-0 bg-gradient-to-t from-black/85 via-black/40 to-transparent p-3 text-pure-white">
+                  <p className="text-xs font-medium line-clamp-2 drop-shadow-xs">
+                    {task.promptText}
+                  </p>
+                  <div className="flex items-center gap-2 mt-1 text-[10px] text-pure-white/70 font-mono">
+                    <span className="truncate">{task.photoName}</span>
+                    {task.duration && <span>• {task.duration.toFixed(1)}с</span>}
+                  </div>
                 </div>
               </div>
-            </div>
-          );
-        })}
-        </div>
+            ))}
+          </div>
         </>
       )}
     </div>
