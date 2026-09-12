@@ -105,14 +105,14 @@ export const App: React.FC = () => {
       const deltaY = t.clientY - edgeTouchRef.current.startY;
 
       // Only handle clear horizontal swipe gestures
-      if (Math.abs(deltaX) > 30 && Math.abs(deltaX) > Math.abs(deltaY) * 1.1) {
-        // Swipe right from left area (left 35% of screen or up to 130px) opens sidebar
-        if (!sidebarOpen && edgeTouchRef.current.startX < Math.max(130, window.innerWidth * 0.35) && deltaX > 30) {
+      if (Math.abs(deltaX) > 25 && Math.abs(deltaX) > Math.abs(deltaY)) {
+        // Swipe right from anywhere in the left 70% of screen opens sidebar
+        if (!sidebarOpen && edgeTouchRef.current.startX < window.innerWidth * 0.70 && deltaX > 25) {
           setSidebarOpen(true);
           edgeTouchRef.current = null;
         }
         // Swipe left when sidebar is open closes it
-        else if (sidebarOpen && deltaX < -30) {
+        else if (sidebarOpen && deltaX < -25) {
           setSidebarOpen(false);
           edgeTouchRef.current = null;
         }
@@ -716,10 +716,10 @@ export const App: React.FC = () => {
 
         {/* View Content */}
         <main
-          className={`flex-1 min-h-0 overflow-hidden flex flex-col pb-safe ${
+          className={`flex-1 min-h-0 overflow-hidden flex flex-col ${
             activeView === 'studio'
               ? 'p-0'
-              : 'p-3 sm:p-6 md:p-8 overflow-y-auto overscroll-contain'
+              : 'p-3 sm:p-6 md:p-8 overflow-y-auto overscroll-contain pb-safe'
           }`}
         >
           {activeView === 'studio' && (

@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import {
   UploadCloud,
   ImagePlus,
@@ -49,7 +49,17 @@ export const CreationStudio: React.FC<CreationStudioProps> = ({
   const [isRatioOpen, setIsRatioOpen] = useState(false);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const inputRef = useRef<HTMLInputElement>(null);
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
+
+  // Auto-expand textarea up to 5 lines
+  useEffect(() => {
+    if (textareaRef.current) {
+      textareaRef.current.style.height = 'auto';
+      // 1 line ~24px, 5 lines ~115px
+      const clamped = Math.min(Math.max(textareaRef.current.scrollHeight, 24), 115);
+      textareaRef.current.style.height = `${clamped}px`;
+    }
+  }, [promptInput]);
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files.length > 0) {
@@ -72,7 +82,7 @@ export const CreationStudio: React.FC<CreationStudioProps> = ({
     setPromptInput('');
   };
 
-  const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
       handleLaunch();
@@ -219,7 +229,7 @@ export const CreationStudio: React.FC<CreationStudioProps> = ({
       </div>
 
       {/* Docked ChatGPT-Style Prompt Bar */}
-      <div className="shrink-0 w-full max-w-3xl mx-auto px-3 sm:px-4 pt-1.5 pb-[calc(0.75rem+env(safe-area-inset-bottom,0px))] z-20 bg-pure-white">
+      <div className="shrink-0 w-full max-w-3xl mx-auto px-2.5 sm:px-4 pt-1 pb-[calc(0.4rem+env(safe-area-inset-bottom,0px))] z-20 bg-pure-white">
         <div className="relative rounded-2xl border border-hairline bg-pure-white shadow-xl backdrop-blur-md transition-all duration-200 focus-within:border-graphite-ink focus-within:ring-2 focus-within:ring-graphite-ink/5">
           {/* Settings Drawer / Popover */}
           {isSettingsOpen && (
@@ -349,12 +359,12 @@ export const CreationStudio: React.FC<CreationStudioProps> = ({
             </div>
           )}
 
-          {/* Main Input Row: Photo attach + Aspect + Prompt Text + Settings + Send Button */}
-          <div className="flex items-center px-3 py-2 gap-2">
+          {/* Main Input Row: Photo attach + Aspect + Prompt Textarea (expands to 5 lines) + Settings + Send Button */}
+          <div className="flex items-end px-2.5 sm:px-3 py-1.5 sm:py-2 gap-1.5 sm:gap-2">
             {/* Attachment Button (+ Photo) */}
             <button
               onClick={() => fileInputRef.current?.click()}
-              className="p-2 rounded-xl text-mid-ash hover:text-graphite-ink hover:bg-hover-veil transition shrink-0 active:scale-95"
+              className="p-2 mb-0.5 rounded-xl text-mid-ash hover:text-graphite-ink hover:bg-hover-veil transition shrink-0 active:scale-95"
               title="Добавить фотографии"
             >
               <ImagePlus className="w-5 h-5" />
@@ -363,17 +373,17 @@ export const CreationStudio: React.FC<CreationStudioProps> = ({
             {/* Aspect Ratio Badge */}
             <button
               onClick={() => setIsRatioOpen(!isRatioOpen)}
-              className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-mono text-mid-ash hover:text-graphite-ink bg-sidebar-mist hover:bg-hover-veil border border-hairline transition shrink-0 active:scale-95"
+              className="inline-flex items-center gap-1 px-2.5 py-1.5 mb-0.5 rounded-lg text-xs font-mono text-mid-ash hover:text-graphite-ink bg-sidebar-mist hover:bg-hover-veil border border-hairline transition shrink-0 active:scale-95"
               title="Выбрать соотношение сторон"
             >
               <span>{currentRatio.short}</span>
               <ChevronDown className="w-3 h-3" />
             </button>
 
-            {/* Single Prompt Input */}
-            <input
-              ref={inputRef}
-              type="text"
+            {/* Expanding Prompt Textarea up to 5 lines */}
+            <textarea
+              ref={textareaRef}
+              rows={1}
               value={promptInput}
               onChange={(e) => setPromptInput(e.target.value)}
               onKeyDown={handleKeyDown}
@@ -382,13 +392,13 @@ export const CreationStudio: React.FC<CreationStudioProps> = ({
                   ? 'Сначала выберите фото, затем введите промпт...'
                   : `Опишите стиль для ${photos.length} фото и нажмите Enter...`
               }
-              className="flex-1 bg-transparent border-none text-sm text-graphite-ink placeholder:text-hollow focus:outline-none focus:ring-0 py-1.5 px-1 min-w-0"
+              className="flex-1 bg-transparent border-none text-xs sm:text-sm text-graphite-ink placeholder:text-hollow focus:outline-none focus:ring-0 py-1.5 px-1 min-w-0 resize-none max-h-[115px] leading-relaxed overflow-y-auto"
             />
 
             {/* Settings Toggle */}
             <button
               onClick={() => setIsSettingsOpen(!isSettingsOpen)}
-              className={`p-2 rounded-xl text-mid-ash hover:text-graphite-ink hover:bg-hover-veil transition shrink-0 active:scale-95 ${
+              className={`p-2 mb-0.5 rounded-xl text-mid-ash hover:text-graphite-ink hover:bg-hover-veil transition shrink-0 active:scale-95 ${
                 isSettingsOpen ? 'bg-hover-veil text-graphite-ink' : ''
               }`}
               title="Настройки генерации"
@@ -400,7 +410,7 @@ export const CreationStudio: React.FC<CreationStudioProps> = ({
             <button
               onClick={handleLaunch}
               disabled={!canLaunch}
-              className="w-8 h-8 rounded-full bg-graphite-ink text-pure-white flex items-center justify-center hover:bg-black disabled:opacity-25 disabled:hover:bg-graphite-ink transition shrink-0 shadow-xs active:scale-95"
+              className="w-8 h-8 mb-0.5 rounded-full bg-graphite-ink text-pure-white flex items-center justify-center hover:bg-black disabled:opacity-25 disabled:hover:bg-graphite-ink transition shrink-0 shadow-xs active:scale-95"
               title={
                 photos.length === 0
                   ? 'Сначала добавьте фото'
