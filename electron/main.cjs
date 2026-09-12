@@ -1,13 +1,16 @@
-const { app, BrowserWindow, shell } = require('electron');
+const { app, BrowserWindow, shell, nativeTheme } = require('electron');
 const path = require('path');
 
 function createWindow() {
+  // Enforce light theme for native Windows window frame and titlebar
+  nativeTheme.themeSource = 'light';
+
   const win = new BrowserWindow({
     width: 1280,
     height: 840,
     minWidth: 850,
     minHeight: 550,
-    backgroundColor: '#09090b',
+    backgroundColor: '#ffffff',
     titleBarStyle: 'default',
     icon: path.join(__dirname, '../assets/logo.ico'),
     webPreferences: {
@@ -16,6 +19,7 @@ function createWindow() {
     },
   });
 
+  win.setBackgroundColor('#ffffff');
   win.setMenuBarVisibility(false);
 
   // Open target="_blank" links in external browser

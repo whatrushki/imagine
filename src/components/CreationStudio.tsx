@@ -114,7 +114,7 @@ export const CreationStudio: React.FC<CreationStudioProps> = ({
       >
         {photos.length === 0 ? (
           /* Empty State: ChatGPT Style Welcome */
-          <div className="max-w-xl mx-auto h-full flex flex-col items-center justify-center text-center px-4 py-8 space-y-6">
+          <div className="max-w-2xl mx-auto h-full flex flex-col items-center justify-center text-center px-4 py-8 space-y-6">
             <div className="w-16 h-16 rounded-2xl bg-sidebar-mist border border-hairline flex items-center justify-center shadow-xs">
               <img
                 src="./logo.svg"
@@ -152,7 +152,7 @@ export const CreationStudio: React.FC<CreationStudioProps> = ({
           </div>
         ) : (
           /* Photos Grid Area */
-          <div className="max-w-5xl mx-auto space-y-4">
+          <div className="max-w-7xl mx-auto space-y-4">
             {/* Top Toolbar */}
             <div className="flex items-center justify-between gap-2 pb-2 border-b border-hairline">
               <div className="flex items-center gap-2">
@@ -229,8 +229,8 @@ export const CreationStudio: React.FC<CreationStudioProps> = ({
       </div>
 
       {/* Docked ChatGPT-Style Prompt Bar */}
-      <div className="shrink-0 w-full max-w-3xl mx-auto px-2.5 sm:px-4 pt-1 pb-[calc(0.4rem+env(safe-area-inset-bottom,0px))] z-20 bg-pure-white">
-        <div className="relative rounded-2xl border border-hairline bg-pure-white shadow-xl backdrop-blur-md transition-all duration-200 focus-within:border-graphite-ink focus-within:ring-2 focus-within:ring-graphite-ink/5">
+      <div className="shrink-0 w-full max-w-5xl mx-auto px-2.5 sm:px-6 pt-1 pb-[calc(0.5rem+env(safe-area-inset-bottom,0px))] z-20 bg-pure-white">
+        <div className="relative rounded-2xl sm:rounded-3xl border border-hairline bg-pure-white shadow-xl backdrop-blur-md transition-all duration-200 focus-within:border-graphite-ink focus-within:ring-2 focus-within:ring-graphite-ink/5 p-2 sm:p-3 flex flex-col gap-1.5">
           {/* Settings Drawer / Popover */}
           {isSettingsOpen && (
             <div className="absolute bottom-full mb-3 right-0 w-80 bg-pure-white border border-hairline rounded-2xl shadow-2xl p-4 z-30 space-y-3.5 animate-in fade-in slide-in-from-bottom-2 duration-200">
@@ -335,7 +335,7 @@ export const CreationStudio: React.FC<CreationStudioProps> = ({
 
           {/* Aspect Ratio Menu Popover */}
           {isRatioOpen && (
-            <div className="absolute bottom-full mb-3 left-4 w-60 bg-pure-white border border-hairline rounded-2xl shadow-2xl p-2 z-30 space-y-1 animate-in fade-in slide-in-from-bottom-2 duration-200">
+            <div className="absolute bottom-full mb-3 left-3 w-60 bg-pure-white border border-hairline rounded-2xl shadow-2xl p-2 z-30 space-y-1 animate-in fade-in slide-in-from-bottom-2 duration-200">
               <div className="px-2 py-1 text-[11px] font-semibold text-mid-ash uppercase tracking-wider">
                 Формат изображения (1.5K)
               </div>
@@ -359,28 +359,8 @@ export const CreationStudio: React.FC<CreationStudioProps> = ({
             </div>
           )}
 
-          {/* Main Input Row: Photo attach + Aspect + Prompt Textarea (expands to 5 lines) + Settings + Send Button */}
-          <div className="flex items-end px-2.5 sm:px-3 py-1.5 sm:py-2 gap-1.5 sm:gap-2">
-            {/* Attachment Button (+ Photo) */}
-            <button
-              onClick={() => fileInputRef.current?.click()}
-              className="p-2 mb-0.5 rounded-xl text-mid-ash hover:text-graphite-ink hover:bg-hover-veil transition shrink-0 active:scale-95"
-              title="Добавить фотографии"
-            >
-              <ImagePlus className="w-5 h-5" />
-            </button>
-
-            {/* Aspect Ratio Badge */}
-            <button
-              onClick={() => setIsRatioOpen(!isRatioOpen)}
-              className="inline-flex items-center gap-1 px-2.5 py-1.5 mb-0.5 rounded-lg text-xs font-mono text-mid-ash hover:text-graphite-ink bg-sidebar-mist hover:bg-hover-veil border border-hairline transition shrink-0 active:scale-95"
-              title="Выбрать соотношение сторон"
-            >
-              <span>{currentRatio.short}</span>
-              <ChevronDown className="w-3 h-3" />
-            </button>
-
-            {/* Expanding Prompt Textarea up to 5 lines */}
+          {/* Top Row: Full-width Auto-expanding Textarea (up to 5 lines) */}
+          <div className="w-full px-1.5 pt-0.5">
             <textarea
               ref={textareaRef}
               rows={1}
@@ -389,38 +369,67 @@ export const CreationStudio: React.FC<CreationStudioProps> = ({
               onKeyDown={handleKeyDown}
               placeholder={
                 photos.length === 0
-                  ? 'Сначала выберите фото, затем введите промпт...'
+                  ? 'Сначала выберите фото, затем опишите стиль...'
                   : `Опишите стиль для ${photos.length} фото и нажмите Enter...`
               }
-              className="flex-1 bg-transparent border-none text-xs sm:text-sm text-graphite-ink placeholder:text-hollow focus:outline-none focus:ring-0 py-1.5 px-1 min-w-0 resize-none max-h-[115px] leading-relaxed overflow-y-auto"
+              className="w-full bg-transparent border-none text-sm text-graphite-ink placeholder:text-mid-ash/70 focus:outline-none focus:ring-0 p-0 resize-none max-h-[125px] leading-relaxed overflow-y-auto block"
             />
+          </div>
 
-            {/* Settings Toggle */}
-            <button
-              onClick={() => setIsSettingsOpen(!isSettingsOpen)}
-              className={`p-2 mb-0.5 rounded-xl text-mid-ash hover:text-graphite-ink hover:bg-hover-veil transition shrink-0 active:scale-95 ${
-                isSettingsOpen ? 'bg-hover-veil text-graphite-ink' : ''
-              }`}
-              title="Настройки генерации"
-            >
-              <SlidersHorizontal className="w-4 h-4" />
-            </button>
+          {/* Bottom Toolbar: Tools on Left, Settings + Send on Right (ChatGPT Style) */}
+          <div className="flex items-center justify-between pt-0.5">
+            {/* Left Controls: Add Photo + Aspect Ratio */}
+            <div className="flex items-center gap-1.5 sm:gap-2">
+              <button
+                type="button"
+                onClick={() => fileInputRef.current?.click()}
+                className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-full text-xs font-medium text-graphite-ink hover:text-black bg-sidebar-mist hover:bg-hover-veil border border-hairline transition shrink-0 active:scale-95"
+                title="Добавить фотографии"
+              >
+                <Plus className="w-3.5 h-3.5" />
+                <span className="text-[11px] font-medium hidden xs:inline sm:inline">Фото</span>
+              </button>
 
-            {/* Send / Launch Arrow Button (ChatGPT Style) */}
-            <button
-              onClick={handleLaunch}
-              disabled={!canLaunch}
-              className="w-8 h-8 mb-0.5 rounded-full bg-graphite-ink text-pure-white flex items-center justify-center hover:bg-black disabled:opacity-25 disabled:hover:bg-graphite-ink transition shrink-0 shadow-xs active:scale-95"
-              title={
-                photos.length === 0
-                  ? 'Сначала добавьте фото'
-                  : !promptInput.trim()
-                  ? 'Введите промпт'
-                  : `Запустить генерацию (${photos.length} задач)`
-              }
-            >
-              <ArrowUp className="w-4 h-4 stroke-[2.5]" />
-            </button>
+              <button
+                type="button"
+                onClick={() => setIsRatioOpen(!isRatioOpen)}
+                className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-full text-xs font-mono font-medium text-graphite-ink hover:text-black bg-sidebar-mist hover:bg-hover-veil border border-hairline transition shrink-0 active:scale-95"
+                title="Выбрать соотношение сторон"
+              >
+                <span>{currentRatio.short}</span>
+                <ChevronDown className="w-3 h-3 text-mid-ash" />
+              </button>
+            </div>
+
+            {/* Right Controls: Settings + Submit */}
+            <div className="flex items-center gap-1.5 sm:gap-2">
+              <button
+                type="button"
+                onClick={() => setIsSettingsOpen(!isSettingsOpen)}
+                className={`p-2 rounded-full text-mid-ash hover:text-graphite-ink hover:bg-hover-veil transition shrink-0 active:scale-95 ${
+                  isSettingsOpen ? 'bg-hover-veil text-graphite-ink' : ''
+                }`}
+                title="Параметры генерации"
+              >
+                <SlidersHorizontal className="w-4 h-4" />
+              </button>
+
+              <button
+                type="button"
+                onClick={handleLaunch}
+                disabled={!canLaunch}
+                className="w-8 h-8 rounded-full bg-graphite-ink text-pure-white flex items-center justify-center hover:bg-black disabled:opacity-25 disabled:hover:bg-graphite-ink transition shrink-0 shadow-xs active:scale-95"
+                title={
+                  photos.length === 0
+                    ? 'Сначала добавьте фото'
+                    : !promptInput.trim()
+                    ? 'Введите описание стиля'
+                    : `Запустить генерацию (${photos.length} задач)`
+                }
+              >
+                <ArrowUp className="w-4 h-4 stroke-[2.5]" />
+              </button>
+            </div>
           </div>
         </div>
       </div>

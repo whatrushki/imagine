@@ -130,14 +130,22 @@ export const Sidebar: React.FC<SidebarProps> = ({
         }`}
       >
         {/* Header */}
-        <div className="h-14 border-b border-hairline flex items-center justify-between px-3.5 shrink-0">
+        <div className="h-14 border-b border-hairline flex items-center justify-between px-3 shrink-0">
           {isOpen ? (
             <>
-              <img
-                src="./logo.svg"
-                alt="Logo"
-                className="h-6 w-auto object-contain shrink-0 text-graphite-ink"
-              />
+              <div className="flex items-center gap-2.5 min-w-0">
+                <div className="w-8 h-8 rounded-xl bg-pure-white border border-hairline flex items-center justify-center shadow-xs shrink-0">
+                  <img
+                    src="./logo.svg"
+                    alt="Imagine"
+                    className="w-5 h-auto object-contain text-graphite-ink"
+                  />
+                </div>
+                <div className="flex flex-col min-w-0">
+                  <span className="font-semibold text-xs text-graphite-ink leading-tight truncate">Imagine</span>
+                  <span className="text-[10px] font-mono text-mid-ash leading-none">by W.H.A.T.</span>
+                </div>
+              </div>
               <button
                 onClick={onToggle}
                 className="text-mid-ash hover:text-graphite-ink p-1.5 rounded-lg hover:bg-hover-veil transition"
@@ -150,10 +158,16 @@ export const Sidebar: React.FC<SidebarProps> = ({
           ) : (
             <button
               onClick={onToggle}
-              className="w-full h-full flex items-center justify-center text-mid-ash hover:text-graphite-ink rounded-lg hover:bg-hover-veil transition"
+              className="w-full h-full flex items-center justify-center text-mid-ash hover:text-graphite-ink rounded-lg hover:bg-hover-veil transition group"
               title="Развернуть панель"
             >
-              <PanelLeft className="w-5 h-5 hidden lg:block" />
+              <div className="w-8 h-8 rounded-xl bg-pure-white border border-hairline flex items-center justify-center shadow-xs shrink-0 group-hover:scale-105 transition">
+                <img
+                  src="./logo.svg"
+                  alt="Imagine"
+                  className="w-5 h-auto object-contain text-graphite-ink"
+                />
+              </div>
             </button>
           )}
         </div>
