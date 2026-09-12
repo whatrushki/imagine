@@ -335,19 +335,61 @@ export async function clearGeneratedCache(): Promise<void> {
   } catch {}
 }
 
-/** Direct download to device gallery / files (never opens OS share panel) */
+/** Direct download to device gallery / files with mobile and Capacitor support */
 export async function exportImageToGallery(
   blob: Blob,
   filename: string,
   _title = 'Imagine generation'
 ): Promise<'downloaded'> {
-  const url = URL.createObjectURL(blob);
+  // 1. Convert blob to Base64 Data URL for robust mobile & WebView support
+  const dataUrl = await new Promise<string>((resolve) => {
+    const reader = new FileReader();
+    reader.onloadend = () => resolve(reader.result as string);
+    reader.readAsDataURL(blob);
+  });
+
+  // 2. If running inside Capacitor native Android/iOS shell
+  const cap = typeof window !== 'undefined' && (window as any).Capacitor;
+  if (cap && cap.isNativePlatform?.()) {
+    if (cap.Plugins?.Filesystem) {
+      try {
+        const rawBase64 = dataUrl.replace(/^data:image\/[a-z]+;base64,/, '');
+        await cap.Plugins.Filesystem.writeFile({
+          path: filename,
+          data: rawBase64,
+          directory: 'DOCUMENTS',
+          recursive: true,
+        });
+        return 'downloaded';
+      } catch (nativeErr) {
+        console.warn('Capacitor Filesystem save failed, falling back:', nativeErr);
+      }
+    }
+  }
+
+  // 3. Fallback: Trigger direct anchor download using data URL and synthetic click
   const a = document.createElement('a');
-  a.href = url;
+  a.href = dataUrl;
   a.download = filename;
+  a.style.display = 'none';
   document.body.appendChild(a);
-  a.click();
-  document.body.removeChild(a);
-  setTimeout(() => URL.revokeObjectURL(url), 10000);
+
+  try {
+    const clickEvt = new MouseEvent('click', {
+      view: window,
+      bubbles: true,
+      cancelable: true,
+    });
+    a.dispatchEvent(clickEvt);
+  } catch {
+    a.click();
+  }
+
+  setTimeout(() => {
+    if (document.body.contains(a)) {
+      document.body.removeChild(a);
+    }
+  }, 1000);
+
   return 'downloaded';
 }

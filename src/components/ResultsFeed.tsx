@@ -45,10 +45,7 @@ export const ResultsFeed: React.FC<ResultsFeedProps> = ({
       <div className="py-3 sm:py-4">
         <div className="flex items-center justify-between gap-3">
           <div>
-            <h1 className="text-xl sm:text-2xl font-semibold tracking-tight text-graphite-ink">
-              Галерея
-            </h1>
-            <p className="text-xs text-mid-ash mt-0.5">
+            <p className="text-xs text-mid-ash font-medium">
               {successTasks.length === 0
                 ? 'Хранилище пусто'
                 : `${successTasks.length} сохранённых изображений (1.5K)`}
@@ -134,13 +131,13 @@ export const ResultsFeed: React.FC<ResultsFeedProps> = ({
         </div>
       ) : (
         <>
-          {/* Mobile Grid: 3-column square images edge-to-edge without clutter (Instagram/Photos style) */}
-          <div className="grid grid-cols-3 gap-1 sm:hidden border-t border-hairline pt-1">
+          {/* Mobile Grid: 3-column square images with modern rounded corners */}
+          <div className="grid grid-cols-3 gap-2 sm:hidden border-t border-hairline pt-2.5 px-0.5">
             {successTasks.map((task) => (
               <div
                 key={`mobile-${task.id}`}
                 onClick={() => onOpenLightbox(task)}
-                className="aspect-square relative overflow-hidden bg-sidebar-mist cursor-pointer active:opacity-75 transition"
+                className="aspect-square relative rounded-xl overflow-hidden bg-sidebar-mist border border-hairline/60 shadow-2xs cursor-pointer active:scale-97 transition"
               >
                 <img
                   src={task.resultUrl!}

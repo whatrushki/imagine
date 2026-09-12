@@ -85,7 +85,7 @@ export const CreationStudio: React.FC<CreationStudioProps> = ({
   const canLaunch = photos.length > 0 && promptInput.trim().length > 0;
 
   return (
-    <div className="relative flex flex-col h-[calc(100vh-3.5rem-env(safe-area-inset-top,0px))] overflow-hidden bg-pure-white select-none">
+    <div className="relative flex flex-col flex-1 h-full min-h-0 overflow-hidden bg-pure-white select-none">
       {/* Hidden File Input */}
       <input
         ref={fileInputRef}
@@ -98,7 +98,7 @@ export const CreationStudio: React.FC<CreationStudioProps> = ({
 
       {/* Center Main Canvas / Scrollable Photos */}
       <div
-        className="flex-1 overflow-y-auto px-4 sm:px-6 md:px-8 pt-4 pb-48"
+        className="flex-1 min-h-0 overflow-y-auto overscroll-contain px-4 sm:px-6 md:px-8 pt-4 pb-48"
         onDragOver={(e) => e.preventDefault()}
         onDrop={handleDrop}
       >

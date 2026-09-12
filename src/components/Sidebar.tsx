@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useRef } from 'react';
 import {
   Plus,
   Sparkles,
@@ -75,18 +75,43 @@ export const Sidebar: React.FC<SidebarProps> = ({
     }
   };
 
+  // Touch gesture to swipe-close sidebar on mobile
+  const asideTouchStartRef = useRef<{ x: number; y: number } | null>(null);
+
+  const handleTouchStart = (e: React.TouchEvent) => {
+    if (e.touches.length !== 1) return;
+    asideTouchStartRef.current = {
+      x: e.touches[0].clientX,
+      y: e.touches[0].clientY,
+    };
+  };
+
+  const handleTouchEnd = (e: React.TouchEvent) => {
+    if (!asideTouchStartRef.current || e.changedTouches.length !== 1) return;
+    const deltaX = e.changedTouches[0].clientX - asideTouchStartRef.current.x;
+    const deltaY = e.changedTouches[0].clientY - asideTouchStartRef.current.y;
+    if (deltaX < -35 && Math.abs(deltaX) > Math.abs(deltaY) * 1.2 && isOpen) {
+      onToggle();
+    }
+    asideTouchStartRef.current = null;
+  };
+
   return (
     <>
       {/* Mobile Backdrop */}
       {isOpen && (
         <div
           onClick={onToggle}
+          onTouchStart={handleTouchStart}
+          onTouchEnd={handleTouchEnd}
           className="fixed inset-0 bg-deep-charcoal/40 backdrop-blur-xs z-40 lg:hidden"
         />
       )}
 
       {/* Sidebar Container with Safe Area Support */}
       <aside
+        onTouchStart={handleTouchStart}
+        onTouchEnd={handleTouchEnd}
         className={`fixed top-0 bottom-0 left-0 z-50 flex flex-col bg-sidebar-mist border-r border-hairline transition-all duration-300 pt-safe pb-safe pl-safe ${
           isOpen ? 'w-64 translate-x-0' : '-translate-x-full lg:translate-x-0 lg:w-16'
         }`}

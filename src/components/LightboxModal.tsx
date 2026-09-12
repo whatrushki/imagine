@@ -121,8 +121,15 @@ export const LightboxModal: React.FC<LightboxModalProps> = ({
       onTouchEnd={handleTouchEnd}
       onWheel={handleWheel}
     >
-      {/* 1. TOP OVERLAY HEADER (Floating, edge-to-edge transparent) */}
-      <div className="absolute top-0 inset-x-0 z-30 flex items-center justify-between p-3 sm:p-4 bg-gradient-to-b from-black/85 via-black/40 to-transparent">
+      {/* 1. TOP OVERLAY HEADER (Floating, edge-to-edge transparent with safe area support) */}
+      <div
+        className="absolute top-0 inset-x-0 z-30 flex items-center justify-between px-3 sm:px-5 pb-3 bg-gradient-to-b from-black/90 via-black/50 to-transparent"
+        style={{
+          paddingTop: 'calc(0.75rem + env(safe-area-inset-top, 0px))',
+          paddingLeft: 'calc(0.75rem + env(safe-area-inset-left, 0px))',
+          paddingRight: 'calc(0.75rem + env(safe-area-inset-right, 0px))',
+        }}
+      >
         {/* Left: Close button + counter */}
         <div className="flex items-center gap-3">
           <button
@@ -265,8 +272,15 @@ export const LightboxModal: React.FC<LightboxModalProps> = ({
         )}
       </div>
 
-      {/* 3. BOTTOM OVERLAY FOOTER (Floating gradient bar with prompt & regenerate) */}
-      <div className="absolute bottom-0 inset-x-0 z-30 p-4 sm:p-5 bg-gradient-to-t from-black/95 via-black/60 to-transparent flex flex-col gap-2">
+      {/* 3. BOTTOM OVERLAY FOOTER (Floating gradient bar with prompt & regenerate with safe area support) */}
+      <div
+        className="absolute bottom-0 inset-x-0 z-30 px-4 sm:px-6 pt-8 bg-gradient-to-t from-black/95 via-black/60 to-transparent flex flex-col gap-2"
+        style={{
+          paddingBottom: 'calc(1.25rem + env(safe-area-inset-bottom, 0px))',
+          paddingLeft: 'calc(1rem + env(safe-area-inset-left, 0px))',
+          paddingRight: 'calc(1rem + env(safe-area-inset-right, 0px))',
+        }}
+      >
         <div className="flex items-end justify-between gap-3 max-w-4xl mx-auto w-full">
           {/* Prompt description */}
           <div

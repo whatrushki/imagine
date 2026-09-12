@@ -37,7 +37,9 @@ const defaultSettings: GenerationSettings = {
 };
 
 export const App: React.FC = () => {
-  const [sidebarOpen, setSidebarOpen] = useState(true);
+  const [sidebarOpen, setSidebarOpen] = useState(() =>
+    typeof window !== 'undefined' ? window.innerWidth >= 1024 : true
+  );
   const [activeView, setActiveView] = useState<'studio' | 'queue' | 'gallery'>('studio');
 
   const [photos, setPhotos] = useState<PhotoItem[]>([]);
@@ -82,6 +84,52 @@ export const App: React.FC = () => {
     }
     setShowUpdateModal(true);
   };
+
+  // Mobile edge-swipe gesture to open and close side sheet (Sidebar)
+  const edgeTouchRef = useRef<{ x: number; y: number } | null>(null);
+
+  useEffect(() => {
+    const handleTouchStart = (e: TouchEvent) => {
+      if (e.touches.length !== 1) return;
+      edgeTouchRef.current = {
+        x: e.touches[0].clientX,
+        y: e.touches[0].clientY,
+      };
+    };
+
+    const handleTouchEnd = (e: TouchEvent) => {
+      if (!edgeTouchRef.current || e.changedTouches.length !== 1) return;
+      const start = edgeTouchRef.current;
+      const end = {
+        x: e.changedTouches[0].clientX,
+        y: e.changedTouches[0].clientY,
+      };
+      const deltaX = end.x - start.x;
+      const deltaY = end.y - start.y;
+
+      // Ensure horizontal swipe
+      if (Math.abs(deltaX) > 40 && Math.abs(deltaX) > Math.abs(deltaY) * 1.25) {
+        // Swipe right from left screen edge (< 45px) opens drawer
+        if (!sidebarOpen && start.x < 45 && deltaX > 40) {
+          setSidebarOpen(true);
+        }
+        // Swipe left anywhere closes drawer if open on mobile
+        else if (sidebarOpen && deltaX < -40) {
+          setSidebarOpen(false);
+        }
+      }
+
+      edgeTouchRef.current = null;
+    };
+
+    window.addEventListener('touchstart', handleTouchStart, { passive: true });
+    window.addEventListener('touchend', handleTouchEnd, { passive: true });
+
+    return () => {
+      window.removeEventListener('touchstart', handleTouchStart);
+      window.removeEventListener('touchend', handleTouchEnd);
+    };
+  }, [sidebarOpen]);
 
   // Persistent cache of source photos across batches
   const sourcePhotosMapRef = useRef<Map<string, PhotoItem>>(new Map());
@@ -567,7 +615,7 @@ export const App: React.FC = () => {
   ).length;
 
   return (
-    <div className="min-h-screen bg-pure-white text-graphite-ink flex flex-col font-sans">
+    <div className="h-full w-full bg-pure-white text-graphite-ink flex flex-col font-sans overflow-hidden">
       {/* Sidebar with history management */}
       <Sidebar
         isOpen={sidebarOpen}
@@ -595,13 +643,13 @@ export const App: React.FC = () => {
 
       {/* Main Content Area */}
       <div
-        className={`flex-1 flex flex-col transition-all duration-300 ${
+        className={`flex-1 flex flex-col h-full min-h-0 overflow-hidden transition-all duration-300 ${
           sidebarOpen ? 'lg:pl-64' : 'lg:pl-16'
         }`}
       >
         {/* Top App Bar with Safe Area Support for System Bars */}
         <header
-          className="border-b border-hairline bg-pure-white sticky top-0 z-30 px-4 pt-safe flex items-center justify-between"
+          className="border-b border-hairline bg-pure-white shrink-0 sticky top-0 z-30 px-4 pt-safe flex items-center justify-between"
           style={{ minHeight: 'calc(3.5rem + env(safe-area-inset-top, 0px))' }}
         >
           <div className="flex items-center space-x-3">
@@ -655,10 +703,10 @@ export const App: React.FC = () => {
 
         {/* View Content */}
         <main
-          className={`flex-1 flex flex-col pb-safe ${
+          className={`flex-1 min-h-0 overflow-hidden flex flex-col pb-safe ${
             activeView === 'studio'
-              ? 'p-0 overflow-hidden'
-              : 'p-3 sm:p-6 md:p-8 overflow-y-auto'
+              ? 'p-0'
+              : 'p-3 sm:p-6 md:p-8 overflow-y-auto overscroll-contain'
           }`}
         >
           {activeView === 'studio' && (

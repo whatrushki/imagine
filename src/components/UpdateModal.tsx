@@ -17,10 +17,17 @@ interface UpdateModalProps {
 }
 
 export const UpdateModal: React.FC<UpdateModalProps> = ({ updateInfo, onClose }) => {
-  const isAndroid =
-    typeof navigator !== 'undefined' && /android/i.test(navigator.userAgent);
-  const isWindows =
-    typeof navigator !== 'undefined' && /windows/i.test(navigator.userAgent);
+  const isCapacitor = typeof window !== 'undefined' && (
+    Boolean((window as any).Capacitor?.isNativePlatform?.()) ||
+    window.location.protocol === 'capacitor:' ||
+    window.location.protocol === 'ionic:'
+  );
+  const isElectron = typeof window !== 'undefined' && (
+    /electron/i.test(navigator.userAgent) ||
+    Boolean((window as any).process?.versions?.electron)
+  );
+  const isNativeAndroid = isCapacitor && typeof navigator !== 'undefined' && /android/i.test(navigator.userAgent);
+  const isWeb = !isCapacitor && !isElectron;
 
   const handleDownloadApk = () => {
     if (updateInfo.apkDownloadUrl) {
@@ -111,40 +118,69 @@ export const UpdateModal: React.FC<UpdateModalProps> = ({ updateInfo, onClose })
         </div>
 
         {/* Bottom Actions */}
-        <div className="p-4 border-t border-hairline bg-sidebar-mist/40 flex flex-col sm:flex-row items-stretch sm:items-center justify-end gap-2">
-          <button
-            onClick={onClose}
-            className="px-4 py-2 text-xs text-mid-ash hover:text-graphite-ink border border-hairline hover:bg-hover-veil rounded-full transition"
-          >
-            Напомнить позже
-          </button>
-
-          {/* Primary Action Button based on platform */}
-          {isAndroid && updateInfo.apkDownloadUrl ? (
-            <button
-              onClick={handleDownloadApk}
-              className="inline-flex items-center justify-center gap-1.5 bg-graphite-ink hover:bg-black text-pure-white text-xs font-semibold px-4 py-2 rounded-full transition shadow-xs active:scale-95"
-            >
-              <Smartphone className="w-3.5 h-3.5" />
-              <span>Скачать APK ({updateInfo.latestVersion})</span>
-            </button>
-          ) : isWindows && updateInfo.exeDownloadUrl ? (
-            <button
-              onClick={handleDownloadExe}
-              className="inline-flex items-center justify-center gap-1.5 bg-graphite-ink hover:bg-black text-pure-white text-xs font-semibold px-4 py-2 rounded-full transition shadow-xs active:scale-95"
-            >
-              <Monitor className="w-3.5 h-3.5" />
-              <span>Скачать установщик (.exe)</span>
-            </button>
-          ) : (
-            <button
-              onClick={handleWebReload}
-              className="inline-flex items-center justify-center gap-1.5 bg-graphite-ink hover:bg-black text-pure-white text-xs font-semibold px-4 py-2 rounded-full transition shadow-xs active:scale-95"
-            >
-              <RefreshCw className="w-3.5 h-3.5" />
-              <span>Обновить приложение</span>
-            </button>
+        <div className="p-4 border-t border-hairline bg-sidebar-mist/40 flex flex-col gap-2.5">
+          {/* Optional secondary download pill links for Web users */}
+          {isWeb && (updateInfo.apkDownloadUrl || updateInfo.exeDownloadUrl) && (
+            <div className="flex items-center justify-between gap-2 text-[11px] text-mid-ash pb-1 border-b border-hairline/60">
+              <span>Также доступно для скачивания:</span>
+              <div className="flex items-center gap-2.5">
+                {updateInfo.apkDownloadUrl && (
+                  <a
+                    href={updateInfo.apkDownloadUrl}
+                    className="hover:text-graphite-ink underline inline-flex items-center gap-1 font-medium"
+                  >
+                    <Smartphone className="w-3 h-3" />
+                    <span>Android APK</span>
+                  </a>
+                )}
+                {updateInfo.exeDownloadUrl && (
+                  <a
+                    href={updateInfo.exeDownloadUrl}
+                    className="hover:text-graphite-ink underline inline-flex items-center gap-1 font-medium"
+                  >
+                    <Monitor className="w-3 h-3" />
+                    <span>Windows (.exe)</span>
+                  </a>
+                )}
+              </div>
+            </div>
           )}
+
+          <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-end gap-2">
+            <button
+              onClick={onClose}
+              className="px-4 py-2 text-xs text-mid-ash hover:text-graphite-ink border border-hairline hover:bg-hover-veil rounded-full transition text-center"
+            >
+              Напомнить позже
+            </button>
+
+            {/* Primary Action Button based on platform */}
+            {isNativeAndroid && updateInfo.apkDownloadUrl ? (
+              <button
+                onClick={handleDownloadApk}
+                className="inline-flex items-center justify-center gap-1.5 bg-graphite-ink hover:bg-black text-pure-white text-xs font-semibold px-4 py-2 rounded-full transition shadow-xs active:scale-95"
+              >
+                <Smartphone className="w-3.5 h-3.5" />
+                <span>Скачать APK ({updateInfo.latestVersion})</span>
+              </button>
+            ) : isElectron && updateInfo.exeDownloadUrl ? (
+              <button
+                onClick={handleDownloadExe}
+                className="inline-flex items-center justify-center gap-1.5 bg-graphite-ink hover:bg-black text-pure-white text-xs font-semibold px-4 py-2 rounded-full transition shadow-xs active:scale-95"
+              >
+                <Monitor className="w-3.5 h-3.5" />
+                <span>Скачать установщик (.exe)</span>
+              </button>
+            ) : (
+              <button
+                onClick={handleWebReload}
+                className="inline-flex items-center justify-center gap-1.5 bg-graphite-ink hover:bg-black text-pure-white text-xs font-semibold px-4 py-2 rounded-full transition shadow-xs active:scale-95"
+              >
+                <RefreshCw className="w-3.5 h-3.5" />
+                <span>Обновить страницу</span>
+              </button>
+            )}
+          </div>
         </div>
       </div>
     </div>
