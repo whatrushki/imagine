@@ -85,7 +85,7 @@ export const CreationStudio: React.FC<CreationStudioProps> = ({
   const canLaunch = photos.length > 0 && promptInput.trim().length > 0;
 
   return (
-    <div className="relative flex flex-col flex-1 h-full min-h-0 overflow-hidden bg-pure-white select-none">
+    <div className="flex flex-col flex-1 h-full min-h-0 overflow-hidden bg-pure-white select-none">
       {/* Hidden File Input */}
       <input
         ref={fileInputRef}
@@ -98,7 +98,7 @@ export const CreationStudio: React.FC<CreationStudioProps> = ({
 
       {/* Center Main Canvas / Scrollable Photos */}
       <div
-        className="flex-1 min-h-0 overflow-y-auto overscroll-contain px-4 sm:px-6 md:px-8 pt-4 pb-48"
+        className="flex-1 min-h-0 overflow-y-auto overscroll-contain px-4 sm:px-6 md:px-8 py-4"
         onDragOver={(e) => e.preventDefault()}
         onDrop={handleDrop}
       >
@@ -218,11 +218,8 @@ export const CreationStudio: React.FC<CreationStudioProps> = ({
         )}
       </div>
 
-      {/* Bottom Blur & Fade Gradient */}
-      <div className="pointer-events-none absolute bottom-0 inset-x-0 h-40 bg-gradient-to-t from-pure-white via-pure-white/90 to-transparent backdrop-blur-[2px] z-10" />
-
-      {/* Floating ChatGPT-Style Prompt Bar */}
-      <div className="absolute bottom-3 sm:bottom-5 inset-x-0 mx-auto max-w-3xl w-full px-3 sm:px-4 z-20 pb-safe">
+      {/* Docked ChatGPT-Style Prompt Bar */}
+      <div className="shrink-0 w-full max-w-3xl mx-auto px-3 sm:px-4 pt-1.5 pb-[calc(0.75rem+env(safe-area-inset-bottom,0px))] z-20 bg-pure-white">
         <div className="relative rounded-2xl border border-hairline bg-pure-white shadow-xl backdrop-blur-md transition-all duration-200 focus-within:border-graphite-ink focus-within:ring-2 focus-within:ring-graphite-ink/5">
           {/* Settings Drawer / Popover */}
           {isSettingsOpen && (

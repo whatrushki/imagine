@@ -86,48 +86,53 @@ export const App: React.FC = () => {
   };
 
   // Mobile edge-swipe gesture to open and close side sheet (Sidebar)
-  const edgeTouchRef = useRef<{ x: number; y: number } | null>(null);
+  const edgeTouchRef = useRef<{ startX: number; startY: number } | null>(null);
 
   useEffect(() => {
     const handleTouchStart = (e: TouchEvent) => {
       if (e.touches.length !== 1) return;
+      const t = e.touches[0];
       edgeTouchRef.current = {
-        x: e.touches[0].clientX,
-        y: e.touches[0].clientY,
+        startX: t.clientX,
+        startY: t.clientY,
       };
     };
 
-    const handleTouchEnd = (e: TouchEvent) => {
-      if (!edgeTouchRef.current || e.changedTouches.length !== 1) return;
-      const start = edgeTouchRef.current;
-      const end = {
-        x: e.changedTouches[0].clientX,
-        y: e.changedTouches[0].clientY,
-      };
-      const deltaX = end.x - start.x;
-      const deltaY = end.y - start.y;
+    const handleTouchMove = (e: TouchEvent) => {
+      if (!edgeTouchRef.current || e.touches.length !== 1) return;
+      const t = e.touches[0];
+      const deltaX = t.clientX - edgeTouchRef.current.startX;
+      const deltaY = t.clientY - edgeTouchRef.current.startY;
 
-      // Ensure horizontal swipe
-      if (Math.abs(deltaX) > 40 && Math.abs(deltaX) > Math.abs(deltaY) * 1.25) {
-        // Swipe right from left screen edge (< 45px) opens drawer
-        if (!sidebarOpen && start.x < 45 && deltaX > 40) {
+      // Only handle clear horizontal swipe gestures
+      if (Math.abs(deltaX) > 30 && Math.abs(deltaX) > Math.abs(deltaY) * 1.1) {
+        // Swipe right from left area (left 35% of screen or up to 130px) opens sidebar
+        if (!sidebarOpen && edgeTouchRef.current.startX < Math.max(130, window.innerWidth * 0.35) && deltaX > 30) {
           setSidebarOpen(true);
+          edgeTouchRef.current = null;
         }
-        // Swipe left anywhere closes drawer if open on mobile
-        else if (sidebarOpen && deltaX < -40) {
+        // Swipe left when sidebar is open closes it
+        else if (sidebarOpen && deltaX < -30) {
           setSidebarOpen(false);
+          edgeTouchRef.current = null;
         }
       }
+    };
 
+    const handleTouchEnd = () => {
       edgeTouchRef.current = null;
     };
 
     window.addEventListener('touchstart', handleTouchStart, { passive: true });
+    window.addEventListener('touchmove', handleTouchMove, { passive: true });
     window.addEventListener('touchend', handleTouchEnd, { passive: true });
+    window.addEventListener('touchcancel', handleTouchEnd, { passive: true });
 
     return () => {
       window.removeEventListener('touchstart', handleTouchStart);
+      window.removeEventListener('touchmove', handleTouchMove);
       window.removeEventListener('touchend', handleTouchEnd);
+      window.removeEventListener('touchcancel', handleTouchEnd);
     };
   }, [sidebarOpen]);
 
@@ -640,6 +645,14 @@ export const App: React.FC = () => {
         latestVersion={updateInfo?.latestVersion}
         onOpenUpdateModal={handleOpenUpdateModal}
       />
+
+      {/* Mobile edge swipe detector area for effortless drawer opening */}
+      {!sidebarOpen && (
+        <div
+          className="fixed top-0 bottom-0 left-0 w-8 z-30 lg:hidden pointer-events-auto"
+          aria-hidden="true"
+        />
+      )}
 
       {/* Main Content Area */}
       <div

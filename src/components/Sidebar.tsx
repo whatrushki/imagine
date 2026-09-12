@@ -12,6 +12,7 @@ import {
   Trash2,
 } from 'lucide-react';
 import { SessionItem } from '../types';
+import { CURRENT_VERSION } from '../lib/updateChecker';
 
 interface SidebarProps {
   isOpen: boolean;
@@ -86,11 +87,21 @@ export const Sidebar: React.FC<SidebarProps> = ({
     };
   };
 
+  const handleTouchMove = (e: React.TouchEvent) => {
+    if (!asideTouchStartRef.current || e.touches.length !== 1) return;
+    const deltaX = e.touches[0].clientX - asideTouchStartRef.current.x;
+    const deltaY = e.touches[0].clientY - asideTouchStartRef.current.y;
+    if (deltaX < -30 && Math.abs(deltaX) > Math.abs(deltaY) * 1.1 && isOpen) {
+      onToggle();
+      asideTouchStartRef.current = null;
+    }
+  };
+
   const handleTouchEnd = (e: React.TouchEvent) => {
     if (!asideTouchStartRef.current || e.changedTouches.length !== 1) return;
     const deltaX = e.changedTouches[0].clientX - asideTouchStartRef.current.x;
     const deltaY = e.changedTouches[0].clientY - asideTouchStartRef.current.y;
-    if (deltaX < -35 && Math.abs(deltaX) > Math.abs(deltaY) * 1.2 && isOpen) {
+    if (deltaX < -30 && Math.abs(deltaX) > Math.abs(deltaY) * 1.1 && isOpen) {
       onToggle();
     }
     asideTouchStartRef.current = null;
@@ -103,6 +114,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
         <div
           onClick={onToggle}
           onTouchStart={handleTouchStart}
+          onTouchMove={handleTouchMove}
           onTouchEnd={handleTouchEnd}
           className="fixed inset-0 bg-deep-charcoal/40 backdrop-blur-xs z-40 lg:hidden"
         />
@@ -111,6 +123,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
       {/* Sidebar Container with Safe Area Support */}
       <aside
         onTouchStart={handleTouchStart}
+        onTouchMove={handleTouchMove}
         onTouchEnd={handleTouchEnd}
         className={`fixed top-0 bottom-0 left-0 z-50 flex flex-col bg-sidebar-mist border-r border-hairline transition-all duration-300 pt-safe pb-safe pl-safe ${
           isOpen ? 'w-64 translate-x-0' : '-translate-x-full lg:translate-x-0 lg:w-16'
@@ -314,7 +327,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                   className="font-mono text-mid-ash hover:text-graphite-ink hover:underline"
                   title="Проверить обновления"
                 >
-                  v1.0.2
+                  v{CURRENT_VERSION}
                 </button>
               )}
             </div>
