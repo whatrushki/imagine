@@ -29,6 +29,9 @@ interface SidebarProps {
   isRunning: boolean;
   deferredPrompt: any;
   onInstallPwa: () => void;
+  hasUpdate?: boolean;
+  latestVersion?: string;
+  onOpenUpdateModal?: () => void;
 }
 
 export const Sidebar: React.FC<SidebarProps> = ({
@@ -47,6 +50,9 @@ export const Sidebar: React.FC<SidebarProps> = ({
   isRunning,
   deferredPrompt,
   onInstallPwa,
+  hasUpdate,
+  latestVersion,
+  onOpenUpdateModal,
 }) => {
   const handleViewClick = (view: 'studio' | 'queue' | 'gallery') => {
     onSelectView(view);
@@ -258,10 +264,34 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
         {/* Bottom Section */}
         <div className="border-t border-hairline p-2.5 space-y-2 shrink-0">
+          {hasUpdate && onOpenUpdateModal && (
+            <button
+              onClick={onOpenUpdateModal}
+              className={`w-full flex items-center justify-center gap-1.5 bg-emerald-600 hover:bg-emerald-700 text-pure-white font-medium text-xs py-1.5 px-3 rounded-full transition active:scale-95 shadow-xs animate-pulse ${
+                !isOpen && 'lg:px-0'
+              }`}
+              title="Доступна новая версия Imagine"
+            >
+              <Sparkles className="w-3.5 h-3.5 shrink-0" />
+              {isOpen && <span>Обновление v{latestVersion}</span>}
+            </button>
+          )}
+
           {isOpen && (
-            <div className="flex items-center gap-2 px-2 py-1 text-[11px] text-graphite-ink font-medium">
-              <span className="w-2 h-2 rounded-full bg-graphite-ink" />
-              <span>1.5K Ultra HD</span>
+            <div className="flex items-center justify-between px-2 py-1 text-[11px] text-mid-ash">
+              <div className="flex items-center gap-1.5 text-graphite-ink font-medium">
+                <span className="w-2 h-2 rounded-full bg-graphite-ink" />
+                <span>1.5K UHD</span>
+              </div>
+              {onOpenUpdateModal && (
+                <button
+                  onClick={onOpenUpdateModal}
+                  className="font-mono text-mid-ash hover:text-graphite-ink hover:underline"
+                  title="Проверить обновления"
+                >
+                  v1.0.2
+                </button>
+              )}
             </div>
           )}
 

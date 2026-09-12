@@ -5,6 +5,8 @@ import { CreationStudio } from './components/CreationStudio';
 import { QueueTable } from './components/QueueTable';
 import { ResultsFeed } from './components/ResultsFeed';
 import { LightboxModal } from './components/LightboxModal';
+import { UpdateModal } from './components/UpdateModal';
+import { checkForAppUpdate, UpdateInfo } from './lib/updateChecker';
 import { PhotoItem, MatrixTask, GenerationSettings, SessionItem } from './types';
 import { generateImage, resetGradioClient } from './lib/booguClient';
 import { sanitizeFilename } from './lib/utils';
@@ -54,6 +56,32 @@ export const App: React.FC = () => {
 
   // PWA Prompt
   const [deferredPrompt, setDeferredPrompt] = useState<any>(null);
+
+  // Auto-Update State
+  const [updateInfo, setUpdateInfo] = useState<UpdateInfo | null>(null);
+  const [showUpdateModal, setShowUpdateModal] = useState(false);
+
+  // Check for app updates in background on mount
+  useEffect(() => {
+    const timer = setTimeout(async () => {
+      const info = await checkForAppUpdate();
+      if (info) {
+        setUpdateInfo(info);
+        if (info.hasUpdate) {
+          setShowUpdateModal(true);
+        }
+      }
+    }, 2500);
+    return () => clearTimeout(timer);
+  }, []);
+
+  const handleOpenUpdateModal = async () => {
+    if (!updateInfo) {
+      const info = await checkForAppUpdate();
+      if (info) setUpdateInfo(info);
+    }
+    setShowUpdateModal(true);
+  };
 
   // Persistent cache of source photos across batches
   const sourcePhotosMapRef = useRef<Map<string, PhotoItem>>(new Map());
@@ -560,6 +588,9 @@ export const App: React.FC = () => {
         isRunning={isRunning}
         deferredPrompt={deferredPrompt}
         onInstallPwa={handleInstallPwa}
+        hasUpdate={!!updateInfo?.hasUpdate}
+        latestVersion={updateInfo?.latestVersion}
+        onOpenUpdateModal={handleOpenUpdateModal}
       />
 
       {/* Main Content Area */}
@@ -685,6 +716,14 @@ export const App: React.FC = () => {
           onClose={() => setLightboxTask(null)}
           onRegenerate={handleRegenerateById}
           onDownload={handleDownloadSingle}
+        />
+      )}
+
+      {/* Auto-Update Notification Modal */}
+      {showUpdateModal && updateInfo && (
+        <UpdateModal
+          updateInfo={updateInfo}
+          onClose={() => setShowUpdateModal(false)}
         />
       )}
     </div>
