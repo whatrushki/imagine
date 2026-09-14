@@ -14,6 +14,7 @@ import {
   cacheImageBlob,
   getCachedImageBlob,
   exportImageToGallery,
+  exportMultipleImagesToGallery,
   clearGeneratedCache,
   saveInputPhotos,
   loadInputPhotos,
@@ -334,7 +335,8 @@ export const App: React.FC = () => {
             currentTask.promptText,
             settings.resolution,
             seed,
-            settings.thinking
+            settings.thinking,
+            workerIndex
           );
 
           updateTaskStatus(taskId, {
@@ -367,7 +369,7 @@ export const App: React.FC = () => {
               error: `${errMsg}. Повтор через ${(backoffMs / 1000).toFixed(0)}с (${failCount}/5)`,
             });
 
-            resetGradioClient();
+            resetGradioClient(workerIndex);
 
             setTimeout(() => {
               if (!stopSignalRef.current) {
@@ -421,12 +423,13 @@ export const App: React.FC = () => {
   };
 
   // Launch a new batch: Single prompt + multiple photos immediately sent to queue!
-  const handleStartBatch = async (promptText: string) => {
-    if (photos.length === 0 || !promptText.trim()) return;
+  const handleStartBatch = async (promptText: string, customPhotos?: PhotoItem[]) => {
+    const targetPhotos = customPhotos || photos;
+    if (targetPhotos.length === 0 || !promptText.trim()) return;
 
     // Cache source photos permanently
-    await saveSourcePhotos(photos);
-    for (const p of photos) {
+    await saveSourcePhotos(targetPhotos);
+    for (const p of targetPhotos) {
       sourcePhotosMapRef.current.set(p.id, p);
     }
 
@@ -434,7 +437,7 @@ export const App: React.FC = () => {
     const newBatchTasks: MatrixTask[] = [];
     let idx = tasksRef.current.length;
 
-    photos.forEach((photo) => {
+    targetPhotos.forEach((photo) => {
       newBatchTasks.push({
         id: `${photo.id}_${Date.now()}_${idx}`,
         index: idx,
@@ -586,22 +589,27 @@ export const App: React.FC = () => {
     }
   };
 
-  // Download All ZIP
-  const handleDownloadZip = async () => {
-    const successTasks = tasks.filter((t) => t.status === 'success' && t.resultUrl);
-    if (successTasks.length === 0) return;
-
+  // Helper to build a zip for a given array of tasks with unique filenames and cache fallback
+  const generateTasksZip = async (taskList: MatrixTask[]) => {
     const zip = new JSZip();
-    for (const task of successTasks) {
+    for (let i = 0; i < taskList.length; i++) {
+      const task = taskList[i];
       try {
-        const resp = await fetch(task.resultUrl!);
-        const blob = await resp.blob();
-        const photoStem = task.photoName.replace(/\.[^/.]+$/, '');
-        const slug = sanitizeFilename(task.promptText);
-        const filename = `${photoStem}__${slug}.png`;
-        zip.file(filename, blob);
+        let blob = await getCachedImageBlob(task.id);
+        if (!blob && task.resultUrl) {
+          const resp = await fetch(task.resultUrl);
+          blob = await resp.blob();
+          await cacheImageBlob(task.id, blob);
+        }
+        if (blob) {
+          const photoStem = task.photoName.replace(/\.[^/.]+$/, '');
+          const slug = sanitizeFilename(task.promptText);
+          // Prepend index to prevent duplicate filenames overwriting each other in zip!
+          const filename = `${String(i + 1).padStart(3, '0')}_${photoStem}__${slug}.png`;
+          zip.file(filename, blob);
+        }
       } catch (e) {
-        console.warn('Zip add fail:', e);
+        console.warn('Zip item add fail:', e);
       }
     }
 
@@ -612,6 +620,106 @@ export const App: React.FC = () => {
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);
+  };
+
+  // Download All ZIP
+  const handleDownloadZip = async () => {
+    const successTasks = tasks.filter((t) => t.status === 'success' && t.resultUrl);
+    if (successTasks.length === 0) return;
+    await generateTasksZip(successTasks);
+  };
+
+  // Save All Directly to Phone Gallery (Pictures)
+  const handleSaveAllToGallery = async () => {
+    const successTasks = tasks.filter((t) => t.status === 'success' && t.resultUrl);
+    if (successTasks.length === 0) return;
+    await exportMultipleImagesToGallery(successTasks);
+  };
+
+  // Download Selected Images
+  const handleDownloadSelected = async (selectedTasks: MatrixTask[]) => {
+    if (selectedTasks.length === 0) return;
+    const isMobile =
+      typeof navigator !== 'undefined' &&
+      (/Android|iPhone|iPad|iPod/i.test(navigator.userAgent) ||
+        !!(window as any).Capacitor?.isNativePlatform?.());
+
+    if (isMobile) {
+      await exportMultipleImagesToGallery(selectedTasks);
+    } else {
+      await generateTasksZip(selectedTasks);
+    }
+  };
+
+  // Send Selected Images back to Studio as Source Photos for New Generation
+  const handleSendSelectedToStudio = async (selectedTasks: MatrixTask[]) => {
+    if (selectedTasks.length === 0) return;
+    const newItems: PhotoItem[] = [];
+
+    for (const task of selectedTasks) {
+      try {
+        let blob = await getCachedImageBlob(task.id);
+        if (!blob && task.resultUrl) {
+          const resp = await fetch(task.resultUrl);
+          blob = await resp.blob();
+        }
+        if (blob) {
+          const photoStem = task.photoName.replace(/\.[^/.]+$/, '');
+          const filename = `${photoStem}_edit_${task.id.slice(-4)}.png`;
+          const file = new File([blob], filename, { type: blob.type || 'image/png' });
+          const id = `photo_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+          const item: PhotoItem = {
+            id,
+            name: filename,
+            size: blob.size,
+            dataUrl: URL.createObjectURL(blob),
+            file,
+          };
+          newItems.push(item);
+          sourcePhotosMapRef.current.set(id, item);
+        }
+      } catch (err) {
+        console.warn('Failed to convert task image for studio:', err);
+      }
+    }
+
+    if (newItems.length > 0) {
+      setPhotos((prev) => [...prev, ...newItems]);
+      setActiveView('studio');
+    }
+  };
+
+  // Edit Single Photo directly from Lightbox Modal
+  const handleEditPhotoFromLightbox = async (task: MatrixTask, newPrompt: string) => {
+    try {
+      let blob = await getCachedImageBlob(task.id);
+      if (!blob && task.resultUrl) {
+        const resp = await fetch(task.resultUrl);
+        blob = await resp.blob();
+      }
+      if (!blob) return;
+
+      const photoStem = task.photoName.replace(/\.[^/.]+$/, '');
+      const filename = `${photoStem}_edit.png`;
+      const file = new File([blob], filename, { type: blob.type || 'image/png' });
+      const photoId = `photo_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+      const photoItem: PhotoItem = {
+        id: photoId,
+        name: filename,
+        size: blob.size,
+        dataUrl: URL.createObjectURL(blob),
+        file,
+      };
+
+      sourcePhotosMapRef.current.set(photoId, photoItem);
+      setPhotos([photoItem]);
+
+      // Launch batch immediately with the new prompt
+      await handleStartBatch(newPrompt, [photoItem]);
+      setActiveView('queue');
+    } catch (err) {
+      console.warn('Failed to edit photo from lightbox:', err);
+    }
   };
 
   const successTasksCount = tasks.filter((t) => t.status === 'success').length;
@@ -763,6 +871,9 @@ export const App: React.FC = () => {
               onDownloadSingle={handleDownloadSingle}
               onOpenLightbox={(t) => setLightboxTask(t)}
               onClearGallery={handleClearGallery}
+              onSaveAllToGallery={handleSaveAllToGallery}
+              onSendSelectedToStudio={handleSendSelectedToStudio}
+              onDownloadSelected={handleDownloadSelected}
             />
           )}
         </main>
@@ -777,6 +888,7 @@ export const App: React.FC = () => {
           onClose={() => setLightboxTask(null)}
           onRegenerate={handleRegenerateById}
           onDownload={handleDownloadSingle}
+          onEditPhoto={handleEditPhotoFromLightbox}
         />
       )}
 

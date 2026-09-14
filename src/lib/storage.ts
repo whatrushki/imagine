@@ -354,15 +354,28 @@ export async function exportImageToGallery(
     if (cap.Plugins?.Filesystem) {
       try {
         const rawBase64 = dataUrl.replace(/^data:image\/[a-z]+;base64,/, '');
+        // PICTURES directory ensures Android MediaStore indexes it directly into Gallery
         await cap.Plugins.Filesystem.writeFile({
-          path: filename,
+          path: `Imagine/${filename}`,
           data: rawBase64,
-          directory: 'DOCUMENTS',
+          directory: 'PICTURES',
           recursive: true,
         });
         return 'downloaded';
       } catch (nativeErr) {
-        console.warn('Capacitor Filesystem save failed, falling back:', nativeErr);
+        // Fallback to root PICTURES if subdirectory fails
+        try {
+          const rawBase64 = dataUrl.replace(/^data:image\/[a-z]+;base64,/, '');
+          await cap.Plugins.Filesystem.writeFile({
+            path: filename,
+            data: rawBase64,
+            directory: 'PICTURES',
+            recursive: true,
+          });
+          return 'downloaded';
+        } catch (e2) {
+          console.warn('Capacitor Filesystem save to PICTURES failed, falling back:', e2);
+        }
       }
     }
   }
@@ -392,4 +405,35 @@ export async function exportImageToGallery(
   }, 1000);
 
   return 'downloaded';
+}
+
+/** Batch export images directly to gallery with sequential delay for mobile stability */
+export async function exportMultipleImagesToGallery(
+  tasks: { id: string; resultUrl?: string; photoName: string; promptText: string }[],
+  onProgress?: (done: number, total: number) => void
+): Promise<void> {
+  const sanitize = (str: string) =>
+    str.replace(/[^\w\s-]/gu, '').trim().replace(/[\s_-]+/g, '_').slice(0, 30) || 'image';
+
+  for (let i = 0; i < tasks.length; i++) {
+    const task = tasks[i];
+    if (!task.resultUrl) continue;
+    try {
+      let blob = await getCachedImageBlob(task.id);
+      if (!blob) {
+        const resp = await fetch(task.resultUrl);
+        blob = await resp.blob();
+        await cacheImageBlob(task.id, blob);
+      }
+      const photoStem = task.photoName.replace(/\.[^/.]+$/, '');
+      const slug = sanitize(task.promptText);
+      const filename = `${photoStem}__${slug}__${task.id.slice(-6)}.png`;
+      await exportImageToGallery(blob, filename, task.promptText);
+      onProgress?.(i + 1, tasks.length);
+      // Small pause so mobile WebView can process each file write safely
+      await new Promise((r) => setTimeout(r, 220));
+    } catch (err) {
+      console.warn(`Failed to export image ${task.id}:`, err);
+    }
+  }
 }

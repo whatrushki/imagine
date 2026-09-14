@@ -231,10 +231,10 @@ export const CreationStudio: React.FC<CreationStudioProps> = ({
       {/* Docked ChatGPT-Style Prompt Bar */}
       <div className="shrink-0 w-full max-w-5xl mx-auto px-2.5 sm:px-6 pt-1 pb-[calc(0.5rem+env(safe-area-inset-bottom,0px))] z-20 bg-pure-white">
         <div className="relative rounded-2xl sm:rounded-3xl border border-hairline bg-pure-white shadow-xl backdrop-blur-md transition-all duration-200 focus-within:border-graphite-ink focus-within:ring-2 focus-within:ring-graphite-ink/5 p-2 sm:p-3 flex flex-col gap-1.5">
-          {/* Settings Drawer / Popover */}
+          {/* Settings Drawer / Popover (shadcn/ui style) */}
           {isSettingsOpen && (
-            <div className="absolute bottom-full mb-3 right-0 w-80 bg-pure-white border border-hairline rounded-2xl shadow-2xl p-4 z-30 space-y-3.5 animate-in fade-in slide-in-from-bottom-2 duration-200">
-              <div className="flex items-center justify-between pb-2 border-b border-hairline">
+            <div className="absolute bottom-full mb-3 right-0 w-80 bg-pure-white/95 backdrop-blur-md border border-hairline rounded-2xl shadow-2xl p-3.5 z-30 space-y-3 animate-in fade-in zoom-in-95 slide-in-from-bottom-2 duration-150">
+              <div className="flex items-center justify-between pb-2 border-b border-hairline/60">
                 <div className="flex items-center gap-2">
                   <SlidersHorizontal className="w-4 h-4 text-graphite-ink" />
                   <span className="font-semibold text-xs text-graphite-ink">
@@ -243,7 +243,7 @@ export const CreationStudio: React.FC<CreationStudioProps> = ({
                 </div>
                 <button
                   onClick={() => setIsSettingsOpen(false)}
-                  className="text-mid-ash hover:text-graphite-ink"
+                  className="p-1 rounded-md text-mid-ash hover:text-graphite-ink hover:bg-hover-veil transition"
                 >
                   <X className="w-4 h-4" />
                 </button>
@@ -251,11 +251,11 @@ export const CreationStudio: React.FC<CreationStudioProps> = ({
 
               <div className="space-y-3 text-xs">
                 {/* Workers */}
-                <div className="space-y-1">
+                <div className="space-y-1.5">
                   <label className="text-graphite-ink font-medium flex items-center justify-between">
                     <span className="flex items-center gap-1.5">
                       <Cpu className="w-3.5 h-3.5 text-mid-ash" />
-                      Потоков генерации
+                      Параллельных соединений
                     </span>
                     <span className="font-mono text-mid-ash">{settings.workers}</span>
                   </label>
@@ -264,16 +264,16 @@ export const CreationStudio: React.FC<CreationStudioProps> = ({
                     onChange={(e) =>
                       onUpdateSettings({ ...settings, workers: parseInt(e.target.value, 10) })
                     }
-                    className="w-full bg-sidebar-mist border border-hairline rounded-lg px-2.5 py-1.5 text-xs text-graphite-ink focus:outline-none"
+                    className="w-full bg-sidebar-mist border border-hairline rounded-xl px-2.5 py-1.5 text-xs text-graphite-ink focus:outline-none focus:ring-1 focus:ring-graphite-ink/20"
                   >
-                    <option value={1}>1 поток (рекомендуется для избежания 429)</option>
-                    <option value={2}>2 потока (быстрее)</option>
-                    <option value={3}>3 потока (макс)</option>
+                    <option value={1}>1 соединение (стандарт)</option>
+                    <option value={2}>2 соединения (быстрее)</option>
+                    <option value={3}>3 соединения (макс параллельно)</option>
                   </select>
                 </div>
 
                 {/* Delay */}
-                <div className="space-y-1">
+                <div className="space-y-1.5">
                   <label className="text-graphite-ink font-medium flex items-center justify-between">
                     <span className="flex items-center gap-1.5">
                       <Clock className="w-3.5 h-3.5 text-mid-ash" />
@@ -293,12 +293,12 @@ export const CreationStudio: React.FC<CreationStudioProps> = ({
                         delay: parseFloat(e.target.value) || 0,
                       })
                     }
-                    className="w-full bg-sidebar-mist border border-hairline rounded-lg px-2.5 py-1.5 text-xs text-graphite-ink focus:outline-none"
+                    className="w-full bg-sidebar-mist border border-hairline rounded-xl px-2.5 py-1.5 text-xs text-graphite-ink focus:outline-none focus:ring-1 focus:ring-graphite-ink/20"
                   />
                 </div>
 
                 {/* Seed & Thinking */}
-                <div className="pt-1 space-y-2 border-t border-hairline">
+                <div className="pt-2 space-y-2 border-t border-hairline/60">
                   <label className="flex items-center justify-between cursor-pointer py-0.5">
                     <span className="flex items-center gap-1.5 text-graphite-ink">
                       <Shuffle className="w-3.5 h-3.5 text-mid-ash" />
@@ -310,14 +310,14 @@ export const CreationStudio: React.FC<CreationStudioProps> = ({
                       onChange={(e) =>
                         onUpdateSettings({ ...settings, randomSeed: e.target.checked })
                       }
-                      className="rounded accent-graphite-ink"
+                      className="w-4 h-4 rounded accent-graphite-ink cursor-pointer"
                     />
                   </label>
 
                   <label className="flex items-center justify-between cursor-pointer py-0.5">
                     <span className="flex items-center gap-1.5 text-graphite-ink">
                       <Brain className="w-3.5 h-3.5 text-mid-ash" />
-                      Thinking Mode
+                      Thinking Mode (PE)
                     </span>
                     <input
                       type="checkbox"
@@ -325,7 +325,7 @@ export const CreationStudio: React.FC<CreationStudioProps> = ({
                       onChange={(e) =>
                         onUpdateSettings({ ...settings, thinking: e.target.checked })
                       }
-                      className="rounded accent-graphite-ink"
+                      className="w-4 h-4 rounded accent-graphite-ink cursor-pointer"
                     />
                   </label>
                 </div>
@@ -333,29 +333,38 @@ export const CreationStudio: React.FC<CreationStudioProps> = ({
             </div>
           )}
 
-          {/* Aspect Ratio Menu Popover */}
+          {/* Aspect Ratio Menu Popover (shadcn/ui style) */}
           {isRatioOpen && (
-            <div className="absolute bottom-full mb-3 left-3 w-60 bg-pure-white border border-hairline rounded-2xl shadow-2xl p-2 z-30 space-y-1 animate-in fade-in slide-in-from-bottom-2 duration-200">
-              <div className="px-2 py-1 text-[11px] font-semibold text-mid-ash uppercase tracking-wider">
-                Формат изображения (1.5K)
+            <div className="absolute bottom-full mb-3 left-3 w-64 bg-pure-white/95 backdrop-blur-md border border-hairline rounded-2xl shadow-2xl p-1.5 z-30 space-y-0.5 animate-in fade-in zoom-in-95 slide-in-from-bottom-2 duration-150">
+              <div className="px-2.5 py-1 text-[11px] font-semibold text-mid-ash uppercase tracking-wider">
+                Формат кадра (1.5K UHD)
               </div>
-              {ASPECT_RATIOS.map((item) => (
-                <button
-                  key={item.id}
-                  onClick={() => {
-                    onUpdateSettings({ ...settings, resolution: item.res });
-                    setIsRatioOpen(false);
-                  }}
-                  className={`w-full flex items-center justify-between px-2.5 py-1.5 rounded-lg text-xs transition ${
-                    settings.resolution === item.res
-                      ? 'bg-graphite-ink text-pure-white font-medium'
-                      : 'hover:bg-hover-veil text-graphite-ink'
-                  }`}
-                >
-                  <span>{item.label}</span>
-                  <span className="text-[10px] opacity-70 font-mono">{item.short}</span>
-                </button>
-              ))}
+              <div className="h-[1px] bg-hairline/60 my-1" />
+              {ASPECT_RATIOS.map((item) => {
+                const isActive = settings.resolution === item.res;
+                return (
+                  <button
+                    key={item.id}
+                    onClick={() => {
+                      onUpdateSettings({ ...settings, resolution: item.res });
+                      setIsRatioOpen(false);
+                    }}
+                    className={`w-full flex items-center justify-between px-2.5 py-1.5 rounded-xl text-xs transition cursor-pointer select-none ${
+                      isActive
+                        ? 'bg-graphite-ink text-pure-white font-medium shadow-xs'
+                        : 'hover:bg-hover-veil text-graphite-ink'
+                    }`}
+                  >
+                    <div className="flex items-center gap-2">
+                      <span className={`w-1.5 h-1.5 rounded-full ${isActive ? 'bg-pure-white' : 'bg-transparent'}`} />
+                      <span>{item.label}</span>
+                    </div>
+                    <span className={`text-[10px] font-mono ${isActive ? 'text-pure-white/70' : 'text-mid-ash'}`}>
+                      {item.short}
+                    </span>
+                  </button>
+                );
+              })}
             </div>
           )}
 

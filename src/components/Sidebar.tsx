@@ -172,20 +172,6 @@ export const Sidebar: React.FC<SidebarProps> = ({
           )}
         </div>
 
-        {/* New Generation Button */}
-        <div className="p-3 shrink-0">
-          <button
-            onClick={handleNewGenClick}
-            className={`w-full flex items-center justify-center gap-2 bg-graphite-ink hover:bg-ink-press text-pure-white font-medium text-xs py-2 px-3 rounded-full transition active:scale-95 shadow-xs ${
-              !isOpen && 'lg:px-0'
-            }`}
-            title="Новая генерация"
-          >
-            <Plus className="w-4 h-4 shrink-0" />
-            {isOpen && <span>Новая генерация</span>}
-          </button>
-        </div>
-
         {/* Navigation Tabs */}
         <div className="px-2 space-y-1 shrink-0">
           {/* Studio Tab */}

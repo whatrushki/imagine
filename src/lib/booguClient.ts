@@ -16,24 +16,30 @@ export const RESOLUTIONS_1_5K = [
 
 export const SERVER_URL = 'https://demo-edit-turbo-1k.boogu.org/';
 
-let sharedClient: any = null;
+// Separate connection pool per parallel worker thread
+const clientPool = new Map<number, any>();
 
-export function resetGradioClient(): void {
-  sharedClient = null;
+export function resetGradioClient(workerId = 0): void {
+  clientPool.delete(workerId);
 }
 
-export async function getGradioClient(): Promise<any> {
-  if (!sharedClient) {
-    // Gradio client in browser connects over HTTPS/WSS
-    sharedClient = await Client.connect(SERVER_URL);
-    // Synchronize 1.5K choices so client validation accepts 1.5K resolutions
+export function resetAllGradioClients(): void {
+  clientPool.clear();
+}
+
+export async function getGradioClient(workerId = 0): Promise<any> {
+  let client = clientPool.get(workerId);
+  if (!client) {
+    // Each worker connects with its own distinct session and WebSocket connection
+    client = await Client.connect(SERVER_URL);
     try {
-      await sharedClient.predict('/update_res_choices', ['1.5K']);
+      await client.predict('/update_res_choices', ['1.5K']);
     } catch (e) {
-      console.warn('1.5K choices sync:', e);
+      console.warn(`[Worker ${workerId}] 1.5K choices sync:`, e);
     }
+    clientPool.set(workerId, client);
   }
-  return sharedClient;
+  return client;
 }
 
 export async function generateImage(
@@ -41,9 +47,10 @@ export async function generateImage(
   instruction: string,
   resolution = '1536x1536 ( 1:1 )',
   seed = 42,
-  thinking = false
+  thinking = false,
+  workerId = 0
 ): Promise<{ resultUrl: string; duration: number }> {
-  const client = await getGradioClient();
+  const client = await getGradioClient(workerId);
   const { width, height } = parseResDims(resolution);
 
   const t0 = performance.now();
