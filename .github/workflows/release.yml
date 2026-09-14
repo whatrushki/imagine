@@ -50,14 +50,18 @@ jobs:
       - name: Rename EXE output
         shell: pwsh
         run: |
-          $installer = Get-ChildItem -Path "dist-electron\*.exe" -Exclude "*blockmap*" | Select-Object -First 1
-          if ($installer) {
-            Copy-Item $installer.FullName -Destination "dist-electron\Imagine-Setup.exe" -Force
-            Get-ChildItem -Path "dist-electron\*.exe" | Where-Object { $_.Name -ne "Imagine-Setup.exe" } | Remove-Item -Force -ErrorAction SilentlyContinue
-            Write-Host "Prepared only single installer: Imagine-Setup.exe"
-          } else {
-            Write-Error "Installer exe was not found"
+          $target = "dist-electron\Imagine-Setup.exe"
+          if (-not (Test-Path $target)) {
+            $installer = Get-ChildItem -Path "dist-electron\*.exe" -Exclude "*blockmap*" | Select-Object -First 1
+            if ($installer) {
+              Copy-Item $installer.FullName -Destination $target -Force
+            } else {
+              Write-Error "Installer exe was not found in dist-electron"
+              exit 1
+            }
           }
+          Get-ChildItem -Path "dist-electron\*.exe" | Where-Object { $_.Name -ne "Imagine-Setup.exe" } | Remove-Item -Force -ErrorAction SilentlyContinue
+          Write-Host "Prepared only single installer: Imagine-Setup.exe"
 
       - name: Upload EXE artifact
         uses: actions/upload-artifact@v4
