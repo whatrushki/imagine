@@ -547,6 +547,17 @@ export const App: React.FC = () => {
     activeQueueRef.current = activeQueueRef.current.filter((id) => id !== taskId);
   };
 
+  const handleDeleteTasks = (taskIds: string[]) => {
+    const idsSet = new Set(taskIds);
+    setTasks((prev) => {
+      const updated = prev.filter((t) => !idsSet.has(t.id));
+      tasksRef.current = updated;
+      saveQueueTasks(updated);
+      return updated;
+    });
+    activeQueueRef.current = activeQueueRef.current.filter((id) => !idsSet.has(id));
+  };
+
   const handleClearCompletedTasks = () => {
     setTasks((prev) => {
       const updated = prev.filter((t) => t.status !== 'success' && t.status !== 'error');
@@ -784,18 +795,18 @@ export const App: React.FC = () => {
         activeView={activeView}
         onSelectView={(v) => {
           setActiveView(v);
-          setSidebarOpen(false);
+          if (window.innerWidth < 1024) setSidebarOpen(false);
         }}
         onNewGeneration={() => {
           handleNewGeneration();
-          setSidebarOpen(false);
+          if (window.innerWidth < 1024) setSidebarOpen(false);
         }}
         sessions={sessions}
         currentSessionId={currentSessionId}
         onSelectSession={(id) => {
           setCurrentSessionId(id);
           setActiveView('gallery');
-          setSidebarOpen(false);
+          if (window.innerWidth < 1024) setSidebarOpen(false);
         }}
         onClearHistory={handleClearHistory}
         onDeleteSession={handleDeleteSession}
@@ -1039,6 +1050,7 @@ export const App: React.FC = () => {
               onNewGeneration={handleNewGeneration}
               onRegenerateTask={handleRegenerateById}
               onDeleteTask={handleDeleteTask}
+              onDeleteTasks={handleDeleteTasks}
               onDownloadZip={handleDownloadZip}
               onDownloadSingle={handleDownloadSingle}
               onOpenLightbox={(t) => setLightboxTask(t)}

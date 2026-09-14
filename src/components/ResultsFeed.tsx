@@ -21,6 +21,7 @@ interface ResultsFeedProps {
   onNewGeneration: () => void;
   onRegenerateTask: (taskId: string) => void;
   onDeleteTask?: (taskId: string) => void;
+  onDeleteTasks?: (taskIds: string[]) => void;
   onDownloadZip: () => void;
   onDownloadSingle: (task: MatrixTask) => void;
   onOpenLightbox: (task: MatrixTask) => void;
@@ -42,6 +43,7 @@ export const ResultsFeed: React.FC<ResultsFeedProps> = ({
   onNewGeneration,
   onRegenerateTask,
   onDeleteTask,
+  onDeleteTasks,
   onDownloadZip,
   onDownloadSingle,
   onOpenLightbox,
@@ -62,7 +64,8 @@ export const ResultsFeed: React.FC<ResultsFeedProps> = ({
   const [contextMenu, setContextMenu] = useState<{
     x: number;
     y: number;
-    task: MatrixTask;
+    tasks: MatrixTask[];
+    isBatch: boolean;
   } | null>(null);
 
   const longPressTimerRef = useRef<number | null>(null);
@@ -128,21 +131,46 @@ export const ResultsFeed: React.FC<ResultsFeedProps> = ({
     }
   };
 
-  // Touch handlers for long-press selection on mobile
+  // Touch handlers for long-press selection / batch context menu on mobile
   const handleTouchStart = (task: MatrixTask, e: React.TouchEvent) => {
     if (e.touches.length !== 1) return;
     touchStartPosRef.current = { x: e.touches[0].clientX, y: e.touches[0].clientY };
 
     longPressTimerRef.current = window.setTimeout(() => {
-      setSelectionMode(true);
-      setSelectedIds((prev) => {
-        const next = new Set(prev);
-        next.add(task.id);
-        return next;
-      });
-      try {
-        navigator.vibrate?.(45);
-      } catch {}
+      if (selectionMode && selectedIds.size > 0) {
+        if (selectedIds.has(task.id)) {
+          // Long press on a SELECTED photo -> open batch context menu for all selected!
+          const touchX = touchStartPosRef.current?.x || 100;
+          const touchY = touchStartPosRef.current?.y || 200;
+          const batchTasks = successTasks.filter((t) => selectedIds.has(t.id));
+          const menuWidth = 200;
+          const menuHeight = 260;
+          const x = Math.min(Math.max(12, touchX - 90), window.innerWidth - menuWidth - 12);
+          const y = Math.min(Math.max(12, touchY - 40), window.innerHeight - menuHeight - 12);
+          setContextMenu({
+            x,
+            y,
+            tasks: batchTasks,
+            isBatch: true,
+          });
+          try {
+            navigator.vibrate?.(45);
+          } catch {}
+        } else {
+          // Long press on an UNSELECTED photo while selection is active -> ignore
+        }
+      } else {
+        // Not in selection mode: long press activates selection mode and selects this task
+        setSelectionMode(true);
+        setSelectedIds((prev) => {
+          const next = new Set(prev);
+          next.add(task.id);
+          return next;
+        });
+        try {
+          navigator.vibrate?.(45);
+        } catch {}
+      }
       longPressTimerRef.current = null;
     }, 450);
   };
@@ -175,6 +203,30 @@ export const ResultsFeed: React.FC<ResultsFeedProps> = ({
   const handleContextMenu = (e: React.MouseEvent, task: MatrixTask) => {
     e.preventDefault();
     e.stopPropagation();
+
+    // If selection mode is active and there are selected tasks
+    if (selectionMode && selectedIds.size > 0) {
+      // Unselected photo: cannot open context menu
+      if (!selectedIds.has(task.id)) {
+        return;
+      }
+
+      // Selected photo: open batch context menu for all selected photos!
+      const batchTasks = successTasks.filter((t) => selectedIds.has(t.id));
+      const menuWidth = 200;
+      const menuHeight = 260;
+      const x = Math.min(Math.max(12, e.clientX), window.innerWidth - menuWidth - 12);
+      const y = Math.min(Math.max(12, e.clientY), window.innerHeight - menuHeight - 12);
+      setContextMenu({
+        x,
+        y,
+        tasks: batchTasks,
+        isBatch: true,
+      });
+      return;
+    }
+
+    // Normal mode (not selecting): open single photo context menu
     const menuWidth = 190;
     const menuHeight = 230;
     const x = Math.min(Math.max(12, e.clientX), window.innerWidth - menuWidth - 12);
@@ -182,7 +234,8 @@ export const ResultsFeed: React.FC<ResultsFeedProps> = ({
     setContextMenu({
       x,
       y,
-      task,
+      tasks: [task],
+      isBatch: false,
     });
   };
 
@@ -276,7 +329,8 @@ export const ResultsFeed: React.FC<ResultsFeedProps> = ({
                         setContextMenu({
                           x: Math.min(Math.max(12, rect.left - 140), window.innerWidth - 190),
                           y: Math.min(Math.max(12, rect.bottom + 6), window.innerHeight - 230),
-                          task,
+                          tasks: [task],
+                          isBatch: false,
                         });
                       }}
                       className="absolute top-1.5 right-1.5 z-10 w-6 h-6 rounded-full bg-black/45 hover:bg-black/65 text-pure-white flex items-center justify-center backdrop-blur-xs transition active:scale-90 shadow"
@@ -335,7 +389,8 @@ export const ResultsFeed: React.FC<ResultsFeedProps> = ({
                           setContextMenu({
                             x: Math.min(Math.max(12, rect.left - 140), window.innerWidth - 190),
                             y: Math.min(Math.max(12, rect.bottom + 6), window.innerHeight - 230),
-                            task,
+                            tasks: [task],
+                            isBatch: false,
                           });
                         }}
                         className="p-2 rounded-full bg-black/70 hover:bg-black text-pure-white backdrop-blur-xs transition shadow active:scale-90"
@@ -448,83 +503,179 @@ export const ResultsFeed: React.FC<ResultsFeedProps> = ({
       {contextMenu && (
         <div
           id="gallery-context-menu"
-          className="fixed z-50 min-w-[180px] bg-pure-white text-graphite-ink border border-hairline rounded-xl shadow-2xl p-1 text-xs animate-in fade-in zoom-in-95 duration-150 select-none"
+          className="fixed z-50 min-w-[190px] bg-pure-white text-graphite-ink border border-hairline rounded-xl shadow-2xl p-1 text-xs animate-in fade-in zoom-in-95 duration-150 select-none"
           style={{ top: `${contextMenu.y}px`, left: `${contextMenu.x}px` }}
           onClick={(e) => e.stopPropagation()}
         >
-          <button
-            onClick={() => {
-              setSelectionMode(true);
-              toggleSelect(contextMenu.task.id);
-              setContextMenu(null);
-            }}
-            className="w-full flex items-center gap-2 px-2.5 py-1.5 rounded-lg hover:bg-hover-veil transition font-medium text-left"
-          >
-            <Check className="w-3.5 h-3.5 text-mid-ash" />
-            <span>
-              {selectedIds.has(contextMenu.task.id) ? 'Снять выбор' : 'Выбрать'}
-            </span>
-          </button>
+          {contextMenu.isBatch ? (
+            /* Batch Context Menu for all selected photos */
+            <>
+              <div className="px-2.5 py-1.5 text-[11px] font-semibold text-mid-ash border-b border-hairline mb-1 flex items-center justify-between">
+                <span>Выбрано фото</span>
+                <span className="bg-hover-veil text-graphite-ink px-1.5 py-0.5 rounded font-mono font-bold">
+                  {contextMenu.tasks.length}
+                </span>
+              </div>
 
-          <button
-            onClick={() => {
-              onDownloadSingle(contextMenu.task);
-              setContextMenu(null);
-            }}
-            className="w-full flex items-center gap-2 px-2.5 py-1.5 rounded-lg hover:bg-hover-veil transition font-medium text-left"
-          >
-            <Download className="w-3.5 h-3.5 text-mid-ash" />
-            <span>{isMobile ? 'В галерею' : 'Скачать'}</span>
-          </button>
+              {/* Download all selected */}
+              <button
+                onClick={() => {
+                  if (onDownloadSelected) {
+                    onDownloadSelected(contextMenu.tasks);
+                  } else {
+                    contextMenu.tasks.forEach((t) => onDownloadSingle(t));
+                  }
+                  setContextMenu(null);
+                }}
+                className="w-full flex items-center gap-2 px-2.5 py-1.5 rounded-lg hover:bg-hover-veil transition font-medium text-left"
+              >
+                <Download className="w-3.5 h-3.5 text-mid-ash" />
+                <span>
+                  {isMobile
+                    ? `В галерею (${contextMenu.tasks.length})`
+                    : `Скачать (${contextMenu.tasks.length})`}
+                </span>
+              </button>
 
-          {onSendSelectedToStudio && (
-            <button
-              onClick={() => {
-                onSendSelectedToStudio([contextMenu.task]);
-                setContextMenu(null);
-              }}
-              className="w-full flex items-center gap-2 px-2.5 py-1.5 rounded-lg hover:bg-hover-veil transition font-medium text-left"
-            >
-              <Sparkles className="w-3.5 h-3.5 text-mid-ash" />
-              <span>В студию (повтор)</span>
-            </button>
-          )}
+              {/* Send all selected to Studio */}
+              {onSendSelectedToStudio && (
+                <button
+                  onClick={() => {
+                    onSendSelectedToStudio(contextMenu.tasks);
+                    setContextMenu(null);
+                  }}
+                  className="w-full flex items-center gap-2 px-2.5 py-1.5 rounded-lg hover:bg-hover-veil transition font-medium text-left"
+                >
+                  <Sparkles className="w-3.5 h-3.5 text-mid-ash" />
+                  <span>В студию ({contextMenu.tasks.length})</span>
+                </button>
+              )}
 
-          <button
-            onClick={() => {
-              onRegenerateTask(contextMenu.task.id);
-              setContextMenu(null);
-            }}
-            className="w-full flex items-center gap-2 px-2.5 py-1.5 rounded-lg hover:bg-hover-veil transition font-medium text-left"
-          >
-            <RotateCw className="w-3.5 h-3.5 text-mid-ash" />
-            <span>Повторная генерация</span>
-          </button>
+              {/* Regenerate all selected */}
+              <button
+                onClick={() => {
+                  contextMenu.tasks.forEach((t) => onRegenerateTask(t.id));
+                  setContextMenu(null);
+                }}
+                className="w-full flex items-center gap-2 px-2.5 py-1.5 rounded-lg hover:bg-hover-veil transition font-medium text-left"
+              >
+                <RotateCw className="w-3.5 h-3.5 text-mid-ash" />
+                <span>Повторить генерацию ({contextMenu.tasks.length})</span>
+              </button>
 
-          <div className="h-[1px] bg-hairline my-1" />
+              <div className="h-[1px] bg-hairline my-1" />
 
-          <button
-            onClick={() => {
-              onOpenLightbox(contextMenu.task);
-              setContextMenu(null);
-            }}
-            className="w-full flex items-center gap-2 px-2.5 py-1.5 rounded-lg hover:bg-hover-veil transition font-medium text-left text-mid-ash"
-          >
-            <Maximize2 className="w-3.5 h-3.5" />
-            <span>Открыть</span>
-          </button>
+              {/* Deselect all */}
+              <button
+                onClick={() => {
+                  setSelectedIds(new Set());
+                  setSelectionMode(false);
+                  setContextMenu(null);
+                }}
+                className="w-full flex items-center gap-2 px-2.5 py-1.5 rounded-lg hover:bg-hover-veil transition font-medium text-left text-mid-ash"
+              >
+                <Check className="w-3.5 h-3.5 text-mid-ash" />
+                <span>Снять выбор</span>
+              </button>
 
-          {onDeleteTask && (
-            <button
-              onClick={() => {
-                onDeleteTask(contextMenu.task.id);
-                setContextMenu(null);
-              }}
-              className="w-full flex items-center gap-2 px-2.5 py-1.5 rounded-lg hover:bg-red-50 text-red-600 transition font-medium text-left"
-            >
-              <Trash2 className="w-3.5 h-3.5 text-red-500" />
-              <span>Удалить</span>
-            </button>
+              {/* Delete all selected */}
+              {(onDeleteTasks || onDeleteTask) && (
+                <button
+                  onClick={() => {
+                    if (onDeleteTasks) {
+                      onDeleteTasks(contextMenu.tasks.map((t) => t.id));
+                    } else if (onDeleteTask) {
+                      contextMenu.tasks.forEach((t) => onDeleteTask(t.id));
+                    }
+                    setSelectedIds(new Set());
+                    setSelectionMode(false);
+                    setContextMenu(null);
+                  }}
+                  className="w-full flex items-center gap-2 px-2.5 py-1.5 rounded-lg hover:bg-red-50 text-red-600 transition font-medium text-left"
+                >
+                  <Trash2 className="w-3.5 h-3.5 text-red-500" />
+                  <span>Удалить ({contextMenu.tasks.length})</span>
+                </button>
+              )}
+            </>
+          ) : (
+            /* Single Photo Context Menu */
+            <>
+              <button
+                onClick={() => {
+                  setSelectionMode(true);
+                  toggleSelect(contextMenu.tasks[0].id);
+                  setContextMenu(null);
+                }}
+                className="w-full flex items-center gap-2 px-2.5 py-1.5 rounded-lg hover:bg-hover-veil transition font-medium text-left"
+              >
+                <Check className="w-3.5 h-3.5 text-mid-ash" />
+                <span>
+                  {selectedIds.has(contextMenu.tasks[0].id) ? 'Снять выбор' : 'Выбрать'}
+                </span>
+              </button>
+
+              <button
+                onClick={() => {
+                  onDownloadSingle(contextMenu.tasks[0]);
+                  setContextMenu(null);
+                }}
+                className="w-full flex items-center gap-2 px-2.5 py-1.5 rounded-lg hover:bg-hover-veil transition font-medium text-left"
+              >
+                <Download className="w-3.5 h-3.5 text-mid-ash" />
+                <span>{isMobile ? 'В галерею' : 'Скачать'}</span>
+              </button>
+
+              {onSendSelectedToStudio && (
+                <button
+                  onClick={() => {
+                    onSendSelectedToStudio([contextMenu.tasks[0]]);
+                    setContextMenu(null);
+                  }}
+                  className="w-full flex items-center gap-2 px-2.5 py-1.5 rounded-lg hover:bg-hover-veil transition font-medium text-left"
+                >
+                  <Sparkles className="w-3.5 h-3.5 text-mid-ash" />
+                  <span>В студию (повтор)</span>
+                </button>
+              )}
+
+              <button
+                onClick={() => {
+                  onRegenerateTask(contextMenu.tasks[0].id);
+                  setContextMenu(null);
+                }}
+                className="w-full flex items-center gap-2 px-2.5 py-1.5 rounded-lg hover:bg-hover-veil transition font-medium text-left"
+              >
+                <RotateCw className="w-3.5 h-3.5 text-mid-ash" />
+                <span>Повторная генерация</span>
+              </button>
+
+              <div className="h-[1px] bg-hairline my-1" />
+
+              <button
+                onClick={() => {
+                  onOpenLightbox(contextMenu.tasks[0]);
+                  setContextMenu(null);
+                }}
+                className="w-full flex items-center gap-2 px-2.5 py-1.5 rounded-lg hover:bg-hover-veil transition font-medium text-left text-mid-ash"
+              >
+                <Maximize2 className="w-3.5 h-3.5" />
+                <span>Открыть</span>
+              </button>
+
+              {onDeleteTask && (
+                <button
+                  onClick={() => {
+                    onDeleteTask(contextMenu.tasks[0].id);
+                    setContextMenu(null);
+                  }}
+                  className="w-full flex items-center gap-2 px-2.5 py-1.5 rounded-lg hover:bg-red-50 text-red-600 transition font-medium text-left"
+                >
+                  <Trash2 className="w-3.5 h-3.5 text-red-500" />
+                  <span>Удалить</span>
+                </button>
+              )}
+            </>
           )}
         </div>
       )}
