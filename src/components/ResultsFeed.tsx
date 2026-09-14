@@ -4,11 +4,8 @@ import {
   RotateCw,
   Plus,
   Image as ImageIcon,
-  Trash2,
   Maximize2,
   Check,
-  CheckSquare,
-  Square,
   Sparkles,
   X,
 } from 'lucide-react';
@@ -28,6 +25,8 @@ interface ResultsFeedProps {
   onSaveAllToGallery?: () => void;
   onSendSelectedToStudio?: (tasks: MatrixTask[]) => void;
   onDownloadSelected?: (tasks: MatrixTask[]) => void;
+  selectionMode?: boolean;
+  setSelectionMode?: (val: boolean) => void;
 }
 
 export const ResultsFeed: React.FC<ResultsFeedProps> = ({
@@ -44,9 +43,13 @@ export const ResultsFeed: React.FC<ResultsFeedProps> = ({
   onSaveAllToGallery,
   onSendSelectedToStudio,
   onDownloadSelected,
+  selectionMode: externalSelectionMode,
+  setSelectionMode: externalSetSelectionMode,
 }) => {
-  const [showClearConfirm, setShowClearConfirm] = useState(false);
-  const [selectionMode, setSelectionMode] = useState(false);
+  const [internalSelectionMode, setInternalSelectionMode] = useState(false);
+  const selectionMode = externalSelectionMode !== undefined ? externalSelectionMode : internalSelectionMode;
+  const setSelectionMode = externalSetSelectionMode || setInternalSelectionMode;
+
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [contextMenu, setContextMenu] = useState<{
     x: number;
@@ -151,91 +154,10 @@ export const ResultsFeed: React.FC<ResultsFeedProps> = ({
   const selectedTasks = successTasks.filter((t) => selectedIds.has(t.id));
 
   return (
-    <div className="max-w-6xl mx-auto w-full pb-32 px-1 sm:px-4">
-      {/* Top Header & Actions */}
-      <div className="py-3 sm:py-4">
-        <div className="flex items-center justify-between gap-3">
-          <div>
-            <p className="text-xs text-mid-ash font-medium">
-              {successTasks.length === 0
-                ? 'Хранилище пусто'
-                : `${successTasks.length} сохранённых изображений (1.5K)`}
-            </p>
-          </div>
-
-          {/* Action Buttons */}
-          <div className="flex items-center gap-2 shrink-0">
-            {successTasks.length > 0 && !selectionMode && (
-              <button
-                onClick={() => setSelectionMode(true)}
-                className="inline-flex items-center gap-1.5 border border-hairline hover:bg-hover-veil text-graphite-ink text-xs font-medium px-3 py-1.5 rounded-full transition active:scale-95"
-                title="Выбрать фотографии"
-              >
-                <CheckSquare className="w-3.5 h-3.5" />
-                <span>Выбрать</span>
-              </button>
-            )}
-
-            {successTasks.length > 0 && (
-              <button
-                onClick={isMobile && onSaveAllToGallery ? onSaveAllToGallery : onDownloadZip}
-                className="inline-flex items-center gap-1.5 border border-hairline hover:bg-hover-veil text-graphite-ink text-xs font-medium px-3.5 py-1.5 rounded-full transition active:scale-95"
-                title={isMobile ? 'Сохранить все в галерею' : 'Скачать все в ZIP'}
-              >
-                <Download className="w-3.5 h-3.5" />
-                <span>
-                  {isMobile ? 'В галерею' : 'ZIP'} ({successTasks.length})
-                </span>
-              </button>
-            )}
-
-            {successTasks.length > 0 && onClearGallery && (
-              <>
-                {showClearConfirm ? (
-                  <div className="flex items-center gap-1.5 animate-in fade-in duration-150">
-                    <button
-                      onClick={() => {
-                        onClearGallery();
-                        setShowClearConfirm(false);
-                      }}
-                      className="text-xs font-semibold bg-red-600 hover:bg-red-700 text-pure-white px-3 py-1.5 rounded-full transition active:scale-95 shadow-xs"
-                    >
-                      Удалить все ({successTasks.length})
-                    </button>
-                    <button
-                      onClick={() => setShowClearConfirm(false)}
-                      className="text-xs text-mid-ash hover:text-graphite-ink px-2 py-1.5 rounded-lg transition"
-                    >
-                      Отмена
-                    </button>
-                  </div>
-                ) : (
-                  <button
-                    onClick={() => setShowClearConfirm(true)}
-                    className="inline-flex items-center gap-1 text-xs text-mid-ash hover:text-red-600 px-2.5 py-1.5 rounded-lg transition hover:bg-red-50"
-                    title="Очистить всю галерею"
-                  >
-                    <Trash2 className="w-3.5 h-3.5" />
-                    <span className="hidden sm:inline">Очистить</span>
-                  </button>
-                )}
-              </>
-            )}
-
-            <button
-              onClick={onNewGeneration}
-              className="inline-flex items-center gap-1.5 bg-graphite-ink hover:bg-black text-pure-white text-xs font-medium px-3.5 py-1.5 rounded-full transition shadow-xs active:scale-95"
-            >
-              <Plus className="w-3.5 h-3.5" />
-              <span className="hidden sm:inline">Создать ещё</span>
-            </button>
-          </div>
-        </div>
-      </div>
-
+    <div className="max-w-6xl mx-auto w-full pb-32 px-1 sm:px-4 pt-2 sm:pt-4">
       {/* Grid of Results */}
       {successTasks.length === 0 ? (
-        /* Empty state: No divider under "Хранилище пусто" (Request 9) */
+        /* Empty state: Clean minimal message */
         <div className="py-20 text-center space-y-3">
           <div className="w-12 h-12 rounded-2xl bg-sidebar-mist border border-hairline mx-auto flex items-center justify-center text-mid-ash">
             <ImageIcon className="w-6 h-6 opacity-60" />
@@ -257,7 +179,7 @@ export const ResultsFeed: React.FC<ResultsFeedProps> = ({
       ) : (
         <>
           {/* Mobile Grid: 3-column square images with modern rounded corners */}
-          <div className="grid grid-cols-3 gap-2 sm:hidden border-t border-hairline pt-2.5 px-0.5">
+          <div className="grid grid-cols-3 gap-2 sm:hidden px-0.5">
             {successTasks.map((task) => {
               const isSelected = selectedIds.has(task.id);
               return (
@@ -300,7 +222,7 @@ export const ResultsFeed: React.FC<ResultsFeedProps> = ({
           </div>
 
           {/* Desktop / Tablet Grid: Clean minimal cards */}
-          <div className="hidden sm:grid sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 border-t border-hairline pt-4">
+          <div className="hidden sm:grid sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 pt-1">
             {successTasks.map((task) => {
               const isSelected = selectedIds.has(task.id);
               return (

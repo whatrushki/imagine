@@ -26,7 +26,7 @@ import {
   getAppState,
 } from './lib/storage';
 import { backgroundRunner } from './lib/backgroundRunner';
-import { Menu } from 'lucide-react';
+import { Menu, CheckSquare, Download, Trash2, X } from 'lucide-react';
 
 const defaultSettings: GenerationSettings = {
   resolution: '1536x1536 ( 1:1 )',
@@ -63,6 +63,15 @@ export const App: React.FC = () => {
   // Auto-Update State
   const [updateInfo, setUpdateInfo] = useState<UpdateInfo | null>(null);
   const [showUpdateModal, setShowUpdateModal] = useState(false);
+
+  // Gallery Selection & Confirmation state in Top Header
+  const [isGallerySelectMode, setIsGallerySelectMode] = useState(false);
+  const [showGalleryClearConfirm, setShowGalleryClearConfirm] = useState(false);
+
+  const isMobile =
+    typeof navigator !== 'undefined' &&
+    (/Android|iPhone|iPad|iPod/i.test(navigator.userAgent) ||
+      !!(window as any).Capacitor?.isNativePlatform?.());
 
   // Check for app updates in background on mount
   useEffect(() => {
@@ -793,13 +802,86 @@ export const App: React.FC = () => {
             </span>
           </div>
 
-          {/* Right Header Status */}
+          {/* Right Header Status & Action Controls */}
           <div className="flex items-center space-x-2 text-xs">
             {isRunning && (
               <span className="inline-flex items-center gap-1.5 text-xs text-graphite-ink font-medium bg-sidebar-mist border border-hairline px-2.5 py-1 rounded-full animate-pulse">
                 <span className="w-1.5 h-1.5 rounded-full bg-graphite-ink" />
-                Генерация...
+                <span className="hidden sm:inline">Генерация...</span>
               </span>
+            )}
+
+            {/* Studio Actions in Single Unified Top Header */}
+            {activeView === 'studio' && photos.length > 0 && (
+              <button
+                onClick={handleClearPhotos}
+                className="inline-flex items-center gap-1 text-xs text-mid-ash hover:text-red-600 px-2.5 py-1.5 rounded-lg transition hover:bg-red-50"
+                title="Очистить выбранные фото"
+              >
+                <Trash2 className="w-3.5 h-3.5" />
+                <span className="hidden sm:inline">Очистить ({photos.length})</span>
+              </button>
+            )}
+
+            {/* Gallery Actions in Single Unified Top Header */}
+            {activeView === 'gallery' && successTasksCount > 0 && (
+              <div className="flex items-center gap-1.5">
+                <button
+                  onClick={() => setIsGallerySelectMode(!isGallerySelectMode)}
+                  className={`inline-flex items-center gap-1 border border-hairline text-xs font-medium px-2.5 py-1.5 rounded-full transition active:scale-95 ${
+                    isGallerySelectMode
+                      ? 'bg-graphite-ink text-pure-white border-graphite-ink'
+                      : 'hover:bg-hover-veil text-graphite-ink'
+                  }`}
+                  title={isGallerySelectMode ? 'Отменить выбор' : 'Выбрать фотографии'}
+                >
+                  <CheckSquare className="w-3.5 h-3.5" />
+                  <span>{isGallerySelectMode ? 'Готово' : 'Выбрать'}</span>
+                </button>
+
+                {!isGallerySelectMode && (
+                  <button
+                    onClick={isMobile ? handleSaveAllToGallery : handleDownloadZip}
+                    className="inline-flex items-center gap-1.5 border border-hairline hover:bg-hover-veil text-graphite-ink text-xs font-medium px-3 py-1.5 rounded-full transition active:scale-95"
+                    title={isMobile ? 'Сохранить все в галерею' : 'Скачать все в ZIP'}
+                  >
+                    <Download className="w-3.5 h-3.5" />
+                    <span>
+                      {isMobile ? 'В галерею' : 'ZIP'} ({successTasksCount})
+                    </span>
+                  </button>
+                )}
+
+                {showGalleryClearConfirm ? (
+                  <div className="flex items-center gap-1 animate-in fade-in duration-150">
+                    <button
+                      onClick={() => {
+                        handleClearGallery();
+                        setShowGalleryClearConfirm(false);
+                      }}
+                      className="text-xs font-semibold bg-red-600 hover:bg-red-700 text-pure-white px-2.5 py-1.5 rounded-full transition active:scale-95 shadow-xs"
+                    >
+                      Удалить
+                    </button>
+                    <button
+                      onClick={() => setShowGalleryClearConfirm(false)}
+                      className="text-xs text-mid-ash hover:text-graphite-ink p-1.5 rounded-lg transition"
+                      title="Отмена"
+                    >
+                      <X className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+                ) : (
+                  <button
+                    onClick={() => setShowGalleryClearConfirm(true)}
+                    className="inline-flex items-center gap-1 text-xs text-mid-ash hover:text-red-600 p-1.5 sm:px-2 sm:py-1.5 rounded-lg transition hover:bg-red-50"
+                    title="Очистить галерею"
+                  >
+                    <Trash2 className="w-3.5 h-3.5" />
+                    <span className="hidden sm:inline">Очистить</span>
+                  </button>
+                )}
+              </div>
             )}
           </div>
         </header>
@@ -874,6 +956,8 @@ export const App: React.FC = () => {
               onSaveAllToGallery={handleSaveAllToGallery}
               onSendSelectedToStudio={handleSendSelectedToStudio}
               onDownloadSelected={handleDownloadSelected}
+              selectionMode={isGallerySelectMode}
+              setSelectionMode={setIsGallerySelectMode}
             />
           )}
         </main>

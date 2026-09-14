@@ -18,7 +18,7 @@ export interface UpdateInfo {
 
 declare const __APP_VERSION__: string | undefined;
 
-export const CURRENT_VERSION = typeof __APP_VERSION__ !== 'undefined' ? __APP_VERSION__ : '1.0.7';
+export const CURRENT_VERSION = typeof __APP_VERSION__ !== 'undefined' ? __APP_VERSION__ : '1.0.8';
 const GITHUB_REPO = 'whatrushki/imagine';
 
 /** Parse semver-like string "1.0.2" or "v1.0.2" into comparable numbers */

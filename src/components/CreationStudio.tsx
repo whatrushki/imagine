@@ -108,7 +108,7 @@ export const CreationStudio: React.FC<CreationStudioProps> = ({
 
       {/* Center Main Canvas / Scrollable Photos */}
       <div
-        className="flex-1 min-h-0 overflow-y-auto overscroll-contain px-4 sm:px-6 md:px-8 py-4"
+        className="flex-1 min-h-0 overflow-y-auto overscroll-contain px-4 sm:px-6 md:px-8 pt-6 sm:pt-8 pb-4"
         onDragOver={(e) => e.preventDefault()}
         onDrop={handleDrop}
       >
@@ -153,39 +153,6 @@ export const CreationStudio: React.FC<CreationStudioProps> = ({
         ) : (
           /* Photos Grid Area */
           <div className="max-w-7xl mx-auto space-y-4">
-            {/* Top Toolbar */}
-            <div className="flex items-center justify-between gap-2 pb-2 border-b border-hairline">
-              <div className="flex items-center gap-2">
-                <span className="font-semibold text-sm text-graphite-ink">
-                  Выбранные фото
-                </span>
-                <span className="text-xs font-mono font-medium text-mid-ash bg-sidebar-mist border border-hairline px-2 py-0.5 rounded-full">
-                  {photos.length} шт.
-                </span>
-                {promptInput.trim() && (
-                  <span className="text-xs text-mid-ash font-mono hidden sm:inline">
-                    • будет создано {photos.length} задач в очереди
-                  </span>
-                )}
-              </div>
-
-              <div className="flex items-center gap-2">
-                <button
-                  onClick={() => fileInputRef.current?.click()}
-                  className="inline-flex items-center gap-1.5 text-xs font-medium text-graphite-ink hover:text-black bg-sidebar-mist hover:bg-hover-veil border border-hairline px-3 py-1.5 rounded-lg transition"
-                >
-                  <Plus className="w-3.5 h-3.5" />
-                  <span>Добавить</span>
-                </button>
-                <button
-                  onClick={onClearPhotos}
-                  className="text-xs text-mid-ash hover:text-graphite-ink px-2.5 py-1.5 rounded-lg transition hover:bg-hover-veil"
-                >
-                  Очистить
-                </button>
-              </div>
-            </div>
-
             {/* Photo Cards Grid */}
             <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3">
               {photos.map((photo, idx) => (
@@ -232,9 +199,10 @@ export const CreationStudio: React.FC<CreationStudioProps> = ({
       <div className="shrink-0 w-full max-w-5xl mx-auto px-2.5 sm:px-6 pt-1 pb-[calc(0.5rem+env(safe-area-inset-bottom,0px))] z-20 bg-pure-white">
         <div className="relative rounded-2xl sm:rounded-3xl border border-hairline bg-pure-white shadow-xl backdrop-blur-md transition-all duration-200 focus-within:border-graphite-ink focus-within:ring-2 focus-within:ring-graphite-ink/5 p-2 sm:p-3 flex flex-col gap-1.5">
           {/* Settings Drawer / Popover (shadcn/ui style) */}
+          {/* Settings Drawer / Popover (Custom shadcn/ui style, zero OS system popups) */}
           {isSettingsOpen && (
-            <div className="absolute bottom-full mb-3 right-0 w-80 bg-pure-white/95 backdrop-blur-md border border-hairline rounded-2xl shadow-2xl p-3.5 z-30 space-y-3 animate-in fade-in zoom-in-95 slide-in-from-bottom-2 duration-150">
-              <div className="flex items-center justify-between pb-2 border-b border-hairline/60">
+            <div className="absolute bottom-full mb-3 right-0 w-80 bg-pure-white/95 backdrop-blur-md border border-hairline rounded-2xl shadow-2xl p-3.5 z-30 space-y-3.5 animate-in fade-in zoom-in-95 duration-150">
+              <div className="flex items-center justify-between pb-1.5 border-b border-hairline/60">
                 <div className="flex items-center gap-2">
                   <SlidersHorizontal className="w-4 h-4 text-graphite-ink" />
                   <span className="font-semibold text-xs text-graphite-ink">
@@ -250,96 +218,132 @@ export const CreationStudio: React.FC<CreationStudioProps> = ({
               </div>
 
               <div className="space-y-3 text-xs">
-                {/* Workers */}
+                {/* Workers: Custom Segmented Control (Zero native select) */}
                 <div className="space-y-1.5">
-                  <label className="text-graphite-ink font-medium flex items-center justify-between">
+                  <div className="flex items-center justify-between text-xs font-medium text-graphite-ink">
                     <span className="flex items-center gap-1.5">
                       <Cpu className="w-3.5 h-3.5 text-mid-ash" />
                       Параллельных соединений
                     </span>
                     <span className="font-mono text-mid-ash">{settings.workers}</span>
-                  </label>
-                  <select
-                    value={settings.workers}
-                    onChange={(e) =>
-                      onUpdateSettings({ ...settings, workers: parseInt(e.target.value, 10) })
-                    }
-                    className="w-full bg-sidebar-mist border border-hairline rounded-xl px-2.5 py-1.5 text-xs text-graphite-ink focus:outline-none focus:ring-1 focus:ring-graphite-ink/20"
-                  >
-                    <option value={1}>1 соединение (стандарт)</option>
-                    <option value={2}>2 соединения (быстрее)</option>
-                    <option value={3}>3 соединения (макс параллельно)</option>
-                  </select>
+                  </div>
+                  <div className="grid grid-cols-3 gap-1 p-1 bg-sidebar-mist rounded-xl border border-hairline/60">
+                    {[
+                      { val: 1, label: '1 поток', sub: 'стандарт' },
+                      { val: 2, label: '2 потока', sub: 'быстрее' },
+                      { val: 3, label: '3 потока', sub: 'макс' },
+                    ].map((opt) => {
+                      const isSel = settings.workers === opt.val;
+                      return (
+                        <button
+                          key={opt.val}
+                          type="button"
+                          onClick={() => onUpdateSettings({ ...settings, workers: opt.val })}
+                          className={`py-1.5 px-1 rounded-lg text-xs font-medium transition text-center flex flex-col items-center justify-center ${
+                            isSel
+                              ? 'bg-pure-white text-graphite-ink shadow-xs font-semibold'
+                              : 'text-mid-ash hover:text-graphite-ink'
+                          }`}
+                        >
+                          <span>{opt.label}</span>
+                          <span className="text-[9px] opacity-60 font-mono">{opt.sub}</span>
+                        </button>
+                      );
+                    })}
+                  </div>
                 </div>
 
-                {/* Delay */}
+                {/* Delay: Stepper buttons */}
                 <div className="space-y-1.5">
-                  <label className="text-graphite-ink font-medium flex items-center justify-between">
+                  <div className="flex items-center justify-between text-xs font-medium text-graphite-ink">
                     <span className="flex items-center gap-1.5">
                       <Clock className="w-3.5 h-3.5 text-mid-ash" />
-                      Пауза между запросами (сек)
+                      Пауза между запросами
                     </span>
-                    <span className="font-mono text-mid-ash">{settings.delay}с</span>
-                  </label>
-                  <input
-                    type="number"
-                    step="0.5"
-                    min="0"
-                    max="30"
-                    value={settings.delay}
-                    onChange={(e) =>
-                      onUpdateSettings({
-                        ...settings,
-                        delay: parseFloat(e.target.value) || 0,
-                      })
-                    }
-                    className="w-full bg-sidebar-mist border border-hairline rounded-xl px-2.5 py-1.5 text-xs text-graphite-ink focus:outline-none focus:ring-1 focus:ring-graphite-ink/20"
-                  />
+                    <span className="font-mono font-semibold text-graphite-ink">{settings.delay}с</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() =>
+                        onUpdateSettings({
+                          ...settings,
+                          delay: Math.max(0, +(settings.delay - 0.5).toFixed(1)),
+                        })
+                      }
+                      className="w-8 h-8 rounded-lg bg-sidebar-mist border border-hairline/60 flex items-center justify-center text-sm font-bold text-graphite-ink hover:bg-hover-veil transition active:scale-95"
+                    >
+                      -
+                    </button>
+                    <div className="flex-1 bg-sidebar-mist border border-hairline/60 rounded-lg py-1.5 text-center font-mono text-xs text-graphite-ink">
+                      {settings.delay} сек
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() =>
+                        onUpdateSettings({
+                          ...settings,
+                          delay: Math.min(30, +(settings.delay + 0.5).toFixed(1)),
+                        })
+                      }
+                      className="w-8 h-8 rounded-lg bg-sidebar-mist border border-hairline/60 flex items-center justify-center text-sm font-bold text-graphite-ink hover:bg-hover-veil transition active:scale-95"
+                    >
+                      +
+                    </button>
+                  </div>
                 </div>
 
-                {/* Seed & Thinking */}
-                <div className="pt-2 space-y-2 border-t border-hairline/60">
-                  <label className="flex items-center justify-between cursor-pointer py-0.5">
-                    <span className="flex items-center gap-1.5 text-graphite-ink">
+                {/* Seed & Thinking: Custom Switch Controls (Zero native checkbox) */}
+                <div className="pt-2 space-y-2.5 border-t border-hairline/60">
+                  <div
+                    onClick={() => onUpdateSettings({ ...settings, randomSeed: !settings.randomSeed })}
+                    className="flex items-center justify-between cursor-pointer py-0.5 select-none"
+                  >
+                    <span className="flex items-center gap-1.5 text-graphite-ink font-medium">
                       <Shuffle className="w-3.5 h-3.5 text-mid-ash" />
                       Случайный Seed
                     </span>
-                    <input
-                      type="checkbox"
-                      checked={settings.randomSeed}
-                      onChange={(e) =>
-                        onUpdateSettings({ ...settings, randomSeed: e.target.checked })
-                      }
-                      className="w-4 h-4 rounded accent-graphite-ink cursor-pointer"
-                    />
-                  </label>
+                    <div
+                      className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out ${
+                        settings.randomSeed ? 'bg-graphite-ink' : 'bg-gray-300'
+                      }`}
+                    >
+                      <span
+                        className={`pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
+                          settings.randomSeed ? 'translate-x-4' : 'translate-x-0'
+                        }`}
+                      />
+                    </div>
+                  </div>
 
-                  <label className="flex items-center justify-between cursor-pointer py-0.5">
-                    <span className="flex items-center gap-1.5 text-graphite-ink">
+                  <div
+                    onClick={() => onUpdateSettings({ ...settings, thinking: !settings.thinking })}
+                    className="flex items-center justify-between cursor-pointer py-0.5 select-none"
+                  >
+                    <span className="flex items-center gap-1.5 text-graphite-ink font-medium">
                       <Brain className="w-3.5 h-3.5 text-mid-ash" />
                       Thinking Mode (PE)
                     </span>
-                    <input
-                      type="checkbox"
-                      checked={settings.thinking}
-                      onChange={(e) =>
-                        onUpdateSettings({ ...settings, thinking: e.target.checked })
-                      }
-                      className="w-4 h-4 rounded accent-graphite-ink cursor-pointer"
-                    />
-                  </label>
+                    <div
+                      className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out ${
+                        settings.thinking ? 'bg-graphite-ink' : 'bg-gray-300'
+                      }`}
+                    >
+                      <span
+                        className={`pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
+                          settings.thinking ? 'translate-x-4' : 'translate-x-0'
+                        }`}
+                      />
+                    </div>
+                  </div>
                 </div>
               </div>
             </div>
           )}
 
-          {/* Aspect Ratio Menu Popover (shadcn/ui style) */}
+          {/* Aspect Ratio Menu Popover (Pure options list without title/divider, Request 3) */}
           {isRatioOpen && (
-            <div className="absolute bottom-full mb-3 left-3 w-64 bg-pure-white/95 backdrop-blur-md border border-hairline rounded-2xl shadow-2xl p-1.5 z-30 space-y-0.5 animate-in fade-in zoom-in-95 slide-in-from-bottom-2 duration-150">
-              <div className="px-2.5 py-1 text-[11px] font-semibold text-mid-ash uppercase tracking-wider">
-                Формат кадра (1.5K UHD)
-              </div>
-              <div className="h-[1px] bg-hairline/60 my-1" />
+            <div className="absolute bottom-full mb-3 left-3 w-56 bg-pure-white/95 backdrop-blur-md border border-hairline rounded-2xl shadow-2xl p-1 z-30 space-y-0.5 animate-in fade-in zoom-in-95 duration-150">
               {ASPECT_RATIOS.map((item) => {
                 const isActive = settings.resolution === item.res;
                 return (
