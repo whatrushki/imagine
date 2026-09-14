@@ -40,6 +40,8 @@ export interface GenerationSettings {
 
 export interface SessionItem {
   id: string;
+  batchId?: string;
+  promptText?: string;
   title: string;
   date: string;
   photoCount: number;

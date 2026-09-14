@@ -57,6 +57,9 @@ export const Sidebar: React.FC<SidebarProps> = ({
 }) => {
   const handleViewClick = (view: 'studio' | 'queue' | 'gallery') => {
     onSelectView(view);
+    if (view === 'gallery') {
+      onSelectSession('');
+    }
     if (window.innerWidth < 1024 && isOpen) {
       onToggle();
     }
@@ -173,7 +176,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
         </div>
 
         {/* Navigation Tabs */}
-        <div className="px-2 space-y-1 shrink-0">
+        <div className="px-2 pt-3 space-y-1 shrink-0">
           {/* Studio Tab */}
           <button
             onClick={() => handleViewClick('studio')}
@@ -315,21 +318,15 @@ export const Sidebar: React.FC<SidebarProps> = ({
             </button>
           )}
 
-          {isOpen && (
-            <div className="flex items-center justify-between px-2 py-1 text-[11px] text-mid-ash">
-              <div className="flex items-center gap-1.5 text-graphite-ink font-medium">
-                <span className="w-2 h-2 rounded-full bg-graphite-ink" />
-                <span>1.5K UHD</span>
-              </div>
-              {onOpenUpdateModal && (
-                <button
-                  onClick={onOpenUpdateModal}
-                  className="font-mono text-mid-ash hover:text-graphite-ink hover:underline"
-                  title="Проверить обновления"
-                >
-                  v{CURRENT_VERSION}
-                </button>
-              )}
+          {isOpen && onOpenUpdateModal && (
+            <div className="flex items-center justify-end px-2 py-0.5 text-[11px] text-mid-ash">
+              <button
+                onClick={onOpenUpdateModal}
+                className="font-mono text-mid-ash hover:text-graphite-ink hover:underline"
+                title="Проверить обновления"
+              >
+                v{CURRENT_VERSION}
+              </button>
             </div>
           )}
 

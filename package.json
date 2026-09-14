@@ -1,6 +1,6 @@
 {
   "name": "imagine",
-  "version": "1.0.8",
+  "version": "1.0.9",
   "private": true,
   "type": "module",
   "description": "Imagine • Multi-Prompt Batch AI Image Studio",
@@ -29,7 +29,8 @@
     "nsis": {
       "oneClick": false,
       "allowToChangeInstallationDirectory": true,
-      "createDesktopShortcut": true
+      "createDesktopShortcut": true,
+      "artifactName": "Imagine-Setup.${ext}"
     }
   },
   "dependencies": {

@@ -26,7 +26,7 @@ import {
   getAppState,
 } from './lib/storage';
 import { backgroundRunner } from './lib/backgroundRunner';
-import { Menu, CheckSquare, Download, Trash2, X } from 'lucide-react';
+import { Menu, CheckSquare, Download, Trash2, X, Plus } from 'lucide-react';
 
 const defaultSettings: GenerationSettings = {
   resolution: '1536x1536 ( 1:1 )',
@@ -261,6 +261,15 @@ export const App: React.FC = () => {
     });
   };
 
+  const studioHeaderFileInputRef = useRef<HTMLInputElement>(null);
+
+  const handleHeaderFileInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files && e.target.files.length > 0) {
+      handleAddPhotos(Array.from(e.target.files));
+      e.target.value = '';
+    }
+  };
+
   const handleRemovePhoto = (id: string) => {
     setPhotos((prev) => prev.filter((p) => p.id !== id));
   };
@@ -477,10 +486,11 @@ export const App: React.FC = () => {
     setPhotos([]);
     photosRef.current = [];
 
-    // Save session record
-    const sessId = `session-${Date.now()}`;
+    // Save session record (Request 7)
     const newSession: SessionItem = {
-      id: sessId,
+      id: batchId,
+      batchId,
+      promptText: promptText.trim(),
       title: `${newBatchTasks.length} фото • ${promptText.trim().slice(0, 24)}...`,
       date: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
       photoCount: newBatchTasks.length,
@@ -490,7 +500,7 @@ export const App: React.FC = () => {
     const updatedSessions = [newSession, ...sessions];
     setSessions(updatedSessions);
     saveAppState('sessions', updatedSessions);
-    setCurrentSessionId(sessId);
+    setCurrentSessionId(batchId);
 
     // Navigate to Queue view
     setActiveView('queue');
@@ -554,13 +564,21 @@ export const App: React.FC = () => {
     saveQueueTasks([]);
   };
 
-  // Clear Gallery (removes completed items from gallery vault)
+  // Clear Gallery (removes completed items from gallery vault, or from current session)
   const handleClearGallery = async () => {
-    const remaining = tasksRef.current.filter((t) => t.status !== 'success');
-    setTasks(remaining);
-    tasksRef.current = remaining;
-    saveQueueTasks(remaining);
-    await clearGeneratedCache();
+    if (activeSession) {
+      const targetIds = new Set(galleryTasks.map((t) => t.id));
+      const remaining = tasksRef.current.filter((t) => !targetIds.has(t.id));
+      setTasks(remaining);
+      tasksRef.current = remaining;
+      saveQueueTasks(remaining);
+    } else {
+      const remaining = tasksRef.current.filter((t) => t.status !== 'success');
+      setTasks(remaining);
+      tasksRef.current = remaining;
+      saveQueueTasks(remaining);
+      await clearGeneratedCache();
+    }
   };
 
   // Clear History Sessions
@@ -631,16 +649,18 @@ export const App: React.FC = () => {
     document.body.removeChild(a);
   };
 
-  // Download All ZIP
+  // Download All ZIP (respects session filter)
   const handleDownloadZip = async () => {
-    const successTasks = tasks.filter((t) => t.status === 'success' && t.resultUrl);
+    const target = activeView === 'gallery' && activeSession ? galleryTasks : tasks;
+    const successTasks = target.filter((t) => t.status === 'success' && t.resultUrl);
     if (successTasks.length === 0) return;
     await generateTasksZip(successTasks);
   };
 
-  // Save All Directly to Phone Gallery (Pictures)
+  // Save All Directly to Phone Gallery (respects session filter)
   const handleSaveAllToGallery = async () => {
-    const successTasks = tasks.filter((t) => t.status === 'success' && t.resultUrl);
+    const target = activeView === 'gallery' && activeSession ? galleryTasks : tasks;
+    const successTasks = target.filter((t) => t.status === 'success' && t.resultUrl);
     if (successTasks.length === 0) return;
     await exportMultipleImagesToGallery(successTasks);
   };
@@ -736,6 +756,25 @@ export const App: React.FC = () => {
     (t) => t.status === 'pending' || t.status === 'requeued' || t.status === 'error'
   ).length;
 
+  // Selected history session filtering (Request 7)
+  const activeSession = currentSessionId
+    ? sessions.find((s) => s.id === currentSessionId)
+    : null;
+
+  const galleryTasks = activeSession
+    ? tasks.filter((t) => {
+        if (t.batchId && activeSession.batchId && t.batchId === activeSession.batchId) return true;
+        if (t.batchId && t.batchId === activeSession.id) return true;
+        if (activeSession.promptText && t.promptText === activeSession.promptText) return true;
+        const cleaned = activeSession.title.split('•')[1]?.replace(/\.\.\.$/, '').trim();
+        if (cleaned && t.promptText.includes(cleaned)) return true;
+        return false;
+      })
+    : tasks;
+
+  const currentGallerySuccessTasks = galleryTasks.filter((t) => t.status === 'success' && t.resultUrl);
+  const currentGallerySuccessCount = currentGallerySuccessTasks.length;
+
   return (
     <div className="h-full w-full bg-pure-white text-graphite-ink flex flex-col font-sans overflow-hidden">
       {/* Sidebar with history management */}
@@ -782,28 +821,49 @@ export const App: React.FC = () => {
           className="border-b border-hairline bg-pure-white shrink-0 sticky top-0 z-30 px-4 pt-safe flex items-center justify-between"
           style={{ minHeight: 'calc(3.5rem + env(safe-area-inset-top, 0px))' }}
         >
-          <div className="flex items-center space-x-3">
+          <div className="flex items-center space-x-3 min-w-0">
             {!sidebarOpen && (
               <button
                 onClick={() => setSidebarOpen(true)}
-                className="p-1.5 rounded-lg text-mid-ash hover:text-graphite-ink hover:bg-hover-veil transition lg:hidden"
+                className="p-1.5 rounded-lg text-mid-ash hover:text-graphite-ink hover:bg-hover-veil transition lg:hidden shrink-0"
                 title="Развернуть боковую панель"
               >
                 <Menu className="w-5 h-5" />
               </button>
             )}
 
-            <span className="font-semibold text-sm text-graphite-ink">
-              {activeView === 'studio'
-                ? 'Студия'
-                : activeView === 'queue'
-                ? 'Очередь генерации'
-                : 'Галерея'}
-            </span>
+            {activeView === 'studio' && (
+              <span className="font-semibold text-sm text-graphite-ink">Студия</span>
+            )}
+            {activeView === 'queue' && (
+              <span className="font-semibold text-sm text-graphite-ink">Очередь генерации</span>
+            )}
+            {activeView === 'gallery' && (
+              activeSession ? (
+                <div className="flex items-center gap-1.5 min-w-0">
+                  <button
+                    onClick={() => setCurrentSessionId('')}
+                    className="text-mid-ash hover:text-graphite-ink transition text-xs font-medium hover:underline flex items-center gap-1 shrink-0"
+                    title="Вернуться ко всей галерее"
+                  >
+                    <span>Галерея</span>
+                    <span>/</span>
+                  </button>
+                  <span
+                    className="font-semibold text-xs sm:text-sm text-graphite-ink truncate max-w-[130px] xs:max-w-[200px] sm:max-w-md"
+                    title={activeSession.promptText || activeSession.title}
+                  >
+                    {activeSession.promptText || activeSession.title}
+                  </span>
+                </div>
+              ) : (
+                <span className="font-semibold text-sm text-graphite-ink">Галерея</span>
+              )
+            )}
           </div>
 
           {/* Right Header Status & Action Controls */}
-          <div className="flex items-center space-x-2 text-xs">
+          <div className="flex items-center space-x-2 text-xs shrink-0">
             {isRunning && (
               <span className="inline-flex items-center gap-1.5 text-xs text-graphite-ink font-medium bg-sidebar-mist border border-hairline px-2.5 py-1 rounded-full animate-pulse">
                 <span className="w-1.5 h-1.5 rounded-full bg-graphite-ink" />
@@ -811,20 +871,42 @@ export const App: React.FC = () => {
               </span>
             )}
 
-            {/* Studio Actions in Single Unified Top Header */}
-            {activeView === 'studio' && photos.length > 0 && (
-              <button
-                onClick={handleClearPhotos}
-                className="inline-flex items-center gap-1 text-xs text-mid-ash hover:text-red-600 px-2.5 py-1.5 rounded-lg transition hover:bg-red-50"
-                title="Очистить выбранные фото"
-              >
-                <Trash2 className="w-3.5 h-3.5" />
-                <span className="hidden sm:inline">Очистить ({photos.length})</span>
-              </button>
+            {/* Studio Actions in Single Unified Top Header (Request 5) */}
+            {activeView === 'studio' && (
+              <div className="flex items-center gap-1.5">
+                <input
+                  ref={studioHeaderFileInputRef}
+                  type="file"
+                  multiple
+                  accept="image/*"
+                  className="hidden"
+                  onChange={handleHeaderFileInputChange}
+                />
+                <button
+                  type="button"
+                  onClick={() => studioHeaderFileInputRef.current?.click()}
+                  className="inline-flex items-center gap-1.5 bg-graphite-ink hover:bg-black text-pure-white text-xs font-medium px-3 py-1.5 rounded-full transition shadow-xs active:scale-95"
+                  title="Добавить фотографии"
+                >
+                  <Plus className="w-3.5 h-3.5" />
+                  <span>Добавить фото</span>
+                </button>
+
+                {photos.length > 0 && (
+                  <button
+                    onClick={handleClearPhotos}
+                    className="inline-flex items-center gap-1 text-xs text-mid-ash hover:text-red-600 px-2.5 py-1.5 rounded-lg transition hover:bg-red-50"
+                    title="Очистить выбранные фото"
+                  >
+                    <Trash2 className="w-3.5 h-3.5" />
+                    <span className="hidden sm:inline">Очистить ({photos.length})</span>
+                  </button>
+                )}
+              </div>
             )}
 
             {/* Gallery Actions in Single Unified Top Header */}
-            {activeView === 'gallery' && successTasksCount > 0 && (
+            {activeView === 'gallery' && currentGallerySuccessCount > 0 && (
               <div className="flex items-center gap-1.5">
                 <button
                   onClick={() => setIsGallerySelectMode(!isGallerySelectMode)}
@@ -847,7 +929,7 @@ export const App: React.FC = () => {
                   >
                     <Download className="w-3.5 h-3.5" />
                     <span>
-                      {isMobile ? 'В галерею' : 'ZIP'} ({successTasksCount})
+                      {isMobile ? 'В галерею' : 'ZIP'} ({currentGallerySuccessCount})
                     </span>
                   </button>
                 )}
@@ -943,12 +1025,13 @@ export const App: React.FC = () => {
 
           {activeView === 'gallery' && (
             <ResultsFeed
-              tasks={tasks}
+              tasks={galleryTasks}
               photos={photos}
               isRunning={isRunning}
               onStop={stopQueue}
               onNewGeneration={handleNewGeneration}
               onRegenerateTask={handleRegenerateById}
+              onDeleteTask={handleDeleteTask}
               onDownloadZip={handleDownloadZip}
               onDownloadSingle={handleDownloadSingle}
               onOpenLightbox={(t) => setLightboxTask(t)}
@@ -958,6 +1041,8 @@ export const App: React.FC = () => {
               onDownloadSelected={handleDownloadSelected}
               selectionMode={isGallerySelectMode}
               setSelectionMode={setIsGallerySelectMode}
+              isSessionFiltered={!!activeSession}
+              onResetSessionFilter={() => setCurrentSessionId('')}
             />
           )}
         </main>

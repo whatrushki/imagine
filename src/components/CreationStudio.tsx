@@ -50,6 +50,54 @@ export const CreationStudio: React.FC<CreationStudioProps> = ({
 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const settingsPopoverRef = useRef<HTMLDivElement>(null);
+  const settingsBtnRef = useRef<HTMLButtonElement>(null);
+  const ratioPopoverRef = useRef<HTMLDivElement>(null);
+  const ratioBtnRef = useRef<HTMLButtonElement>(null);
+
+  // Close popovers on outside click or Escape (Request 3)
+  useEffect(() => {
+    const handlePointerDown = (e: MouseEvent | TouchEvent) => {
+      const target = e.target as Node;
+      if (
+        isSettingsOpen &&
+        settingsPopoverRef.current &&
+        !settingsPopoverRef.current.contains(target) &&
+        settingsBtnRef.current &&
+        !settingsBtnRef.current.contains(target)
+      ) {
+        setIsSettingsOpen(false);
+      }
+
+      if (
+        isRatioOpen &&
+        ratioPopoverRef.current &&
+        !ratioPopoverRef.current.contains(target) &&
+        ratioBtnRef.current &&
+        !ratioBtnRef.current.contains(target)
+      ) {
+        setIsRatioOpen(false);
+      }
+    };
+
+    const handleKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        setIsSettingsOpen(false);
+        setIsRatioOpen(false);
+      }
+    };
+
+    if (isSettingsOpen || isRatioOpen) {
+      document.addEventListener('mousedown', handlePointerDown);
+      document.addEventListener('touchstart', handlePointerDown);
+      document.addEventListener('keydown', handleKey);
+    }
+    return () => {
+      document.removeEventListener('mousedown', handlePointerDown);
+      document.removeEventListener('touchstart', handlePointerDown);
+      document.removeEventListener('keydown', handleKey);
+    };
+  }, [isSettingsOpen, isRatioOpen]);
 
   // Auto-expand textarea up to 5 lines
   useEffect(() => {
@@ -199,24 +247,12 @@ export const CreationStudio: React.FC<CreationStudioProps> = ({
       <div className="shrink-0 w-full max-w-5xl mx-auto px-2.5 sm:px-6 pt-1 pb-[calc(0.5rem+env(safe-area-inset-bottom,0px))] z-20 bg-pure-white">
         <div className="relative rounded-2xl sm:rounded-3xl border border-hairline bg-pure-white shadow-xl backdrop-blur-md transition-all duration-200 focus-within:border-graphite-ink focus-within:ring-2 focus-within:ring-graphite-ink/5 p-2 sm:p-3 flex flex-col gap-1.5">
           {/* Settings Drawer / Popover (shadcn/ui style) */}
-          {/* Settings Drawer / Popover (Custom shadcn/ui style, zero OS system popups) */}
+          {/* Settings Drawer / Popover (Custom shadcn/ui style, zero header, zero separator, Request 3) */}
           {isSettingsOpen && (
-            <div className="absolute bottom-full mb-3 right-0 w-80 bg-pure-white/95 backdrop-blur-md border border-hairline rounded-2xl shadow-2xl p-3.5 z-30 space-y-3.5 animate-in fade-in zoom-in-95 duration-150">
-              <div className="flex items-center justify-between pb-1.5 border-b border-hairline/60">
-                <div className="flex items-center gap-2">
-                  <SlidersHorizontal className="w-4 h-4 text-graphite-ink" />
-                  <span className="font-semibold text-xs text-graphite-ink">
-                    Параметры генерации
-                  </span>
-                </div>
-                <button
-                  onClick={() => setIsSettingsOpen(false)}
-                  className="p-1 rounded-md text-mid-ash hover:text-graphite-ink hover:bg-hover-veil transition"
-                >
-                  <X className="w-4 h-4" />
-                </button>
-              </div>
-
+            <div
+              ref={settingsPopoverRef}
+              className="absolute bottom-full mb-3 right-0 w-80 bg-pure-white/95 backdrop-blur-md border border-hairline rounded-2xl shadow-2xl p-3 z-30 space-y-3 animate-in fade-in zoom-in-95 duration-150"
+            >
               <div className="space-y-3 text-xs">
                 {/* Workers: Custom Segmented Control (Zero native select) */}
                 <div className="space-y-1.5">
@@ -293,8 +329,8 @@ export const CreationStudio: React.FC<CreationStudioProps> = ({
                   </div>
                 </div>
 
-                {/* Seed & Thinking: Custom Switch Controls (Zero native checkbox) */}
-                <div className="pt-2 space-y-2.5 border-t border-hairline/60">
+                {/* Seed & Thinking: Custom Switch Controls (Zero separator, clean spacing) */}
+                <div className="space-y-2.5 pt-0.5">
                   <div
                     onClick={() => onUpdateSettings({ ...settings, randomSeed: !settings.randomSeed })}
                     className="flex items-center justify-between cursor-pointer py-0.5 select-none"
@@ -343,7 +379,10 @@ export const CreationStudio: React.FC<CreationStudioProps> = ({
 
           {/* Aspect Ratio Menu Popover (Pure options list without title/divider, Request 3) */}
           {isRatioOpen && (
-            <div className="absolute bottom-full mb-3 left-3 w-56 bg-pure-white/95 backdrop-blur-md border border-hairline rounded-2xl shadow-2xl p-1 z-30 space-y-0.5 animate-in fade-in zoom-in-95 duration-150">
+            <div
+              ref={ratioPopoverRef}
+              className="absolute bottom-full mb-3 left-3 w-56 bg-pure-white/95 backdrop-blur-md border border-hairline rounded-2xl shadow-2xl p-1 z-30 space-y-0.5 animate-in fade-in zoom-in-95 duration-150"
+            >
               {ASPECT_RATIOS.map((item) => {
                 const isActive = settings.resolution === item.res;
                 return (
@@ -404,6 +443,7 @@ export const CreationStudio: React.FC<CreationStudioProps> = ({
               </button>
 
               <button
+                ref={ratioBtnRef}
                 type="button"
                 onClick={() => setIsRatioOpen(!isRatioOpen)}
                 className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-full text-xs font-mono font-medium text-graphite-ink hover:text-black bg-sidebar-mist hover:bg-hover-veil border border-hairline transition shrink-0 active:scale-95"
@@ -417,6 +457,7 @@ export const CreationStudio: React.FC<CreationStudioProps> = ({
             {/* Right Controls: Settings + Submit */}
             <div className="flex items-center gap-1.5 sm:gap-2">
               <button
+                ref={settingsBtnRef}
                 type="button"
                 onClick={() => setIsSettingsOpen(!isSettingsOpen)}
                 className={`p-2 rounded-full text-mid-ash hover:text-graphite-ink hover:bg-hover-veil transition shrink-0 active:scale-95 ${

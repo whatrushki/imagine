@@ -8,6 +8,7 @@ import {
   Check,
   Sparkles,
   X,
+  Trash2,
 } from 'lucide-react';
 import { MatrixTask, PhotoItem } from '../types';
 
@@ -18,6 +19,7 @@ interface ResultsFeedProps {
   onStop: () => void;
   onNewGeneration: () => void;
   onRegenerateTask: (taskId: string) => void;
+  onDeleteTask?: (taskId: string) => void;
   onDownloadZip: () => void;
   onDownloadSingle: (task: MatrixTask) => void;
   onOpenLightbox: (task: MatrixTask) => void;
@@ -27,6 +29,8 @@ interface ResultsFeedProps {
   onDownloadSelected?: (tasks: MatrixTask[]) => void;
   selectionMode?: boolean;
   setSelectionMode?: (val: boolean) => void;
+  isSessionFiltered?: boolean;
+  onResetSessionFilter?: () => void;
 }
 
 export const ResultsFeed: React.FC<ResultsFeedProps> = ({
@@ -36,6 +40,7 @@ export const ResultsFeed: React.FC<ResultsFeedProps> = ({
   onStop,
   onNewGeneration,
   onRegenerateTask,
+  onDeleteTask,
   onDownloadZip,
   onDownloadSingle,
   onOpenLightbox,
@@ -45,6 +50,8 @@ export const ResultsFeed: React.FC<ResultsFeedProps> = ({
   onDownloadSelected,
   selectionMode: externalSelectionMode,
   setSelectionMode: externalSetSelectionMode,
+  isSessionFiltered,
+  onResetSessionFilter,
 }) => {
   const [internalSelectionMode, setInternalSelectionMode] = useState(false);
   const selectionMode = externalSelectionMode !== undefined ? externalSelectionMode : internalSelectionMode;
@@ -68,11 +75,20 @@ export const ResultsFeed: React.FC<ResultsFeedProps> = ({
     (/Android|iPhone|iPad|iPod/i.test(navigator.userAgent) ||
       !!(window as any).Capacitor?.isNativePlatform?.());
 
-  // Close context menu on outside click
+  // Close context menu on outside click or Escape (Request 3)
   useEffect(() => {
     const handleClick = () => setContextMenu(null);
+    const handleKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setContextMenu(null);
+    };
     window.addEventListener('click', handleClick);
-    return () => window.removeEventListener('click', handleClick);
+    window.addEventListener('contextmenu', handleClick);
+    window.addEventListener('keydown', handleKey);
+    return () => {
+      window.removeEventListener('click', handleClick);
+      window.removeEventListener('contextmenu', handleClick);
+      window.removeEventListener('keydown', handleKey);
+    };
   }, []);
 
   const toggleSelect = (taskId: string) => {
@@ -163,18 +179,33 @@ export const ResultsFeed: React.FC<ResultsFeedProps> = ({
             <ImageIcon className="w-6 h-6 opacity-60" />
           </div>
           <div className="space-y-1">
-            <p className="text-sm font-semibold text-graphite-ink">В галерее пока ничего нет</p>
+            <p className="text-sm font-semibold text-graphite-ink">
+              {isSessionFiltered
+                ? 'В этой генерации нет завершённых изображений'
+                : 'В галерее пока ничего нет'}
+            </p>
             <p className="text-xs text-mid-ash max-w-sm mx-auto leading-relaxed">
-              Все сгенерированные фотографии автоматически сохраняются здесь по мере завершения в очереди.
+              {isSessionFiltered
+                ? 'Задачи этой сессии ещё могут выполняться в очереди или были удалены.'
+                : 'Все сгенерированные фотографии автоматически сохраняются здесь по мере завершения в очереди.'}
             </p>
           </div>
-          <button
-            onClick={onNewGeneration}
-            className="inline-flex items-center gap-1.5 text-xs font-medium bg-graphite-ink text-pure-white px-4 py-2 rounded-full hover:bg-black transition active:scale-95 shadow-xs"
-          >
-            <Plus className="w-3.5 h-3.5" />
-            <span>Перейти в студию</span>
-          </button>
+          {isSessionFiltered && onResetSessionFilter ? (
+            <button
+              onClick={onResetSessionFilter}
+              className="inline-flex items-center gap-1.5 text-xs font-medium bg-graphite-ink text-pure-white px-4 py-2 rounded-full hover:bg-black transition active:scale-95 shadow-xs"
+            >
+              <span>Показать всю галерею</span>
+            </button>
+          ) : (
+            <button
+              onClick={onNewGeneration}
+              className="inline-flex items-center gap-1.5 text-xs font-medium bg-graphite-ink text-pure-white px-4 py-2 rounded-full hover:bg-black transition active:scale-95 shadow-xs"
+            >
+              <Plus className="w-3.5 h-3.5" />
+              <span>Перейти в студию</span>
+            </button>
+          )}
         </div>
       ) : (
         <>
@@ -402,6 +433,17 @@ export const ResultsFeed: React.FC<ResultsFeedProps> = ({
             </button>
           )}
 
+          <button
+            onClick={() => {
+              onRegenerateTask(contextMenu.task.id);
+              setContextMenu(null);
+            }}
+            className="w-full flex items-center gap-2 px-2.5 py-1.5 rounded-lg hover:bg-hover-veil transition font-medium text-left"
+          >
+            <RotateCw className="w-3.5 h-3.5 text-mid-ash" />
+            <span>Повторная генерация</span>
+          </button>
+
           <div className="h-[1px] bg-hairline my-1" />
 
           <button
@@ -414,6 +456,19 @@ export const ResultsFeed: React.FC<ResultsFeedProps> = ({
             <Maximize2 className="w-3.5 h-3.5" />
             <span>Открыть</span>
           </button>
+
+          {onDeleteTask && (
+            <button
+              onClick={() => {
+                onDeleteTask(contextMenu.task.id);
+                setContextMenu(null);
+              }}
+              className="w-full flex items-center gap-2 px-2.5 py-1.5 rounded-lg hover:bg-red-50 text-red-600 transition font-medium text-left"
+            >
+              <Trash2 className="w-3.5 h-3.5 text-red-500" />
+              <span>Удалить</span>
+            </button>
+          )}
         </div>
       )}
     </div>

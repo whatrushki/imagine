@@ -45,17 +45,16 @@ jobs:
         run: npm run build
 
       - name: Build Windows Installer (.exe)
-        run: npx electron-builder --win --x64
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: npx electron-builder --win --x64 --publish never
 
       - name: Rename EXE output
         shell: pwsh
         run: |
           $installer = Get-ChildItem -Path "dist-electron\*.exe" -Exclude "*blockmap*" | Select-Object -First 1
           if ($installer) {
-            Copy-Item $installer.FullName -Destination "dist-electron\Imagine-Setup.exe"
-            Write-Host "Prepared: Imagine-Setup.exe"
+            Copy-Item $installer.FullName -Destination "dist-electron\Imagine-Setup.exe" -Force
+            Get-ChildItem -Path "dist-electron\*.exe" | Where-Object { $_.Name -ne "Imagine-Setup.exe" } | Remove-Item -Force -ErrorAction SilentlyContinue
+            Write-Host "Prepared only single installer: Imagine-Setup.exe"
           } else {
             Write-Error "Installer exe was not found"
           }
