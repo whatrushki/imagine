@@ -60,21 +60,21 @@ export const Sidebar: React.FC<SidebarProps> = ({
     if (view === 'gallery') {
       onSelectSession('');
     }
-    if (window.innerWidth < 1024 && isOpen) {
+    if (isOpen) {
       onToggle();
     }
   };
 
   const handleNewGenClick = () => {
     onNewGeneration();
-    if (window.innerWidth < 1024 && isOpen) {
+    if (isOpen) {
       onToggle();
     }
   };
 
   const handleSessionClick = (id: string) => {
     onSelectSession(id);
-    if (window.innerWidth < 1024 && isOpen) {
+    if (isOpen) {
       onToggle();
     }
   };

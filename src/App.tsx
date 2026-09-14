@@ -782,13 +782,20 @@ export const App: React.FC = () => {
         isOpen={sidebarOpen}
         onToggle={() => setSidebarOpen(!sidebarOpen)}
         activeView={activeView}
-        onSelectView={(v) => setActiveView(v)}
-        onNewGeneration={handleNewGeneration}
+        onSelectView={(v) => {
+          setActiveView(v);
+          setSidebarOpen(false);
+        }}
+        onNewGeneration={() => {
+          handleNewGeneration();
+          setSidebarOpen(false);
+        }}
         sessions={sessions}
         currentSessionId={currentSessionId}
         onSelectSession={(id) => {
           setCurrentSessionId(id);
           setActiveView('gallery');
+          setSidebarOpen(false);
         }}
         onClearHistory={handleClearHistory}
         onDeleteSession={handleDeleteSession}

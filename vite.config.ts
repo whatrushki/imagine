@@ -11,7 +11,7 @@ export default defineConfig({
     },
   },
   define: {
-    __APP_VERSION__: JSON.stringify('1.0.9'),
+    __APP_VERSION__: JSON.stringify('1.1.0'),
   },
   plugins: [
     react(),

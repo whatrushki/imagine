@@ -9,6 +9,7 @@ import {
   Sparkles,
   X,
   Trash2,
+  MoreHorizontal,
 } from 'lucide-react';
 import { MatrixTask, PhotoItem } from '../types';
 
@@ -75,21 +76,34 @@ export const ResultsFeed: React.FC<ResultsFeedProps> = ({
     (/Android|iPhone|iPad|iPod/i.test(navigator.userAgent) ||
       !!(window as any).Capacitor?.isNativePlatform?.());
 
-  // Close context menu on outside click or Escape (Request 3)
+  // Close context menu on outside click or Escape
   useEffect(() => {
-    const handleClick = () => setContextMenu(null);
+    if (!contextMenu) return;
+
+    const handlePointerDown = (e: PointerEvent | MouseEvent) => {
+      const el = document.getElementById('gallery-context-menu');
+      if (el && !el.contains(e.target as Node)) {
+        setContextMenu(null);
+      }
+    };
+
     const handleKey = (e: KeyboardEvent) => {
       if (e.key === 'Escape') setContextMenu(null);
     };
-    window.addEventListener('click', handleClick);
-    window.addEventListener('contextmenu', handleClick);
+
+    // Small delay ensures the opening click/event doesn't immediately dismiss the menu
+    const timer = window.setTimeout(() => {
+      window.addEventListener('pointerdown', handlePointerDown);
+    }, 50);
+
     window.addEventListener('keydown', handleKey);
+
     return () => {
-      window.removeEventListener('click', handleClick);
-      window.removeEventListener('contextmenu', handleClick);
+      clearTimeout(timer);
+      window.removeEventListener('pointerdown', handlePointerDown);
       window.removeEventListener('keydown', handleKey);
     };
-  }, []);
+  }, [contextMenu]);
 
   const toggleSelect = (taskId: string) => {
     setSelectedIds((prev) => {
@@ -160,9 +174,14 @@ export const ResultsFeed: React.FC<ResultsFeedProps> = ({
 
   const handleContextMenu = (e: React.MouseEvent, task: MatrixTask) => {
     e.preventDefault();
+    e.stopPropagation();
+    const menuWidth = 190;
+    const menuHeight = 230;
+    const x = Math.min(Math.max(12, e.clientX), window.innerWidth - menuWidth - 12);
+    const y = Math.min(Math.max(12, e.clientY), window.innerHeight - menuHeight - 12);
     setContextMenu({
-      x: Math.min(e.clientX, window.innerWidth - 180),
-      y: Math.min(e.clientY, window.innerHeight - 200),
+      x,
+      y,
       task,
     });
   };
@@ -220,6 +239,7 @@ export const ResultsFeed: React.FC<ResultsFeedProps> = ({
                   onTouchStart={(e) => handleTouchStart(task, e)}
                   onTouchMove={handleTouchMove}
                   onTouchEnd={handleTouchEnd}
+                  onContextMenu={(e) => handleContextMenu(e, task)}
                   className={`aspect-square relative rounded-xl overflow-hidden bg-sidebar-mist border transition cursor-pointer select-none active:scale-97 ${
                     isSelected
                       ? 'ring-2 ring-graphite-ink border-transparent shadow-md'
@@ -234,7 +254,7 @@ export const ResultsFeed: React.FC<ResultsFeedProps> = ({
                   />
 
                   {/* Selection Checkbox Badge */}
-                  {selectionMode && (
+                  {selectionMode ? (
                     <div className="absolute top-1.5 right-1.5 z-10">
                       <div
                         className={`w-5 h-5 rounded-full flex items-center justify-center transition shadow ${
@@ -246,6 +266,24 @@ export const ResultsFeed: React.FC<ResultsFeedProps> = ({
                         <Check className="w-3.5 h-3.5 stroke-[3]" />
                       </div>
                     </div>
+                  ) : (
+                    /* Mobile 3-dots Quick Options Trigger */
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        const rect = e.currentTarget.getBoundingClientRect();
+                        setContextMenu({
+                          x: Math.min(Math.max(12, rect.left - 140), window.innerWidth - 190),
+                          y: Math.min(Math.max(12, rect.bottom + 6), window.innerHeight - 230),
+                          task,
+                        });
+                      }}
+                      className="absolute top-1.5 right-1.5 z-10 w-6 h-6 rounded-full bg-black/45 hover:bg-black/65 text-pure-white flex items-center justify-center backdrop-blur-xs transition active:scale-90 shadow"
+                      title="Меню действий"
+                    >
+                      <MoreHorizontal className="w-3.5 h-3.5" />
+                    </button>
                   )}
                 </div>
               );
@@ -293,6 +331,21 @@ export const ResultsFeed: React.FC<ResultsFeedProps> = ({
                       <button
                         onClick={(e) => {
                           e.stopPropagation();
+                          const rect = e.currentTarget.getBoundingClientRect();
+                          setContextMenu({
+                            x: Math.min(Math.max(12, rect.left - 140), window.innerWidth - 190),
+                            y: Math.min(Math.max(12, rect.bottom + 6), window.innerHeight - 230),
+                            task,
+                          });
+                        }}
+                        className="p-2 rounded-full bg-black/70 hover:bg-black text-pure-white backdrop-blur-xs transition shadow active:scale-90"
+                        title="Действия"
+                      >
+                        <MoreHorizontal className="w-3.5 h-3.5" />
+                      </button>
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
                           onDownloadSingle(task);
                         }}
                         className="p-2 rounded-full bg-black/70 hover:bg-black text-pure-white backdrop-blur-xs transition shadow active:scale-90"
@@ -330,20 +383,23 @@ export const ResultsFeed: React.FC<ResultsFeedProps> = ({
         </>
       )}
 
-      {/* Floating Multi-Select Toolbar (Request 5) */}
+      {/* Floating Multi-Select Toolbar (Adaptive for Mobile & Desktop) */}
       {selectionMode && (
-        <div className="fixed bottom-6 inset-x-3 sm:inset-x-auto sm:left-1/2 sm:-translate-x-1/2 z-40 max-w-md w-full bg-graphite-ink text-pure-white rounded-2xl p-2.5 shadow-2xl border border-hairline/20 flex items-center justify-between gap-2 backdrop-blur-md animate-in fade-in slide-in-from-bottom-3 duration-200">
-          <div className="flex items-center gap-2 pl-2">
-            <span className="text-xs font-semibold">{selectedIds.size} выбрано</span>
+        <div className="fixed bottom-[calc(1rem+env(safe-area-inset-bottom,0px))] left-2 right-2 sm:left-1/2 sm:right-auto sm:-translate-x-1/2 z-40 sm:max-w-md w-auto bg-graphite-ink text-pure-white rounded-2xl p-2 sm:p-2.5 shadow-2xl border border-hairline/20 flex items-center justify-between gap-1.5 sm:gap-2 backdrop-blur-md animate-in fade-in slide-in-from-bottom-3 duration-200">
+          <div className="flex items-center gap-1.5 sm:gap-2 pl-1 sm:pl-2 min-w-0 shrink-0">
+            <span className="text-xs font-semibold whitespace-nowrap bg-white/15 px-2 py-0.5 rounded-lg">
+              {selectedIds.size}
+              <span className="hidden xs:inline ml-1 font-normal text-white/80">выбрано</span>
+            </span>
             <button
               onClick={handleSelectAll}
-              className="text-[11px] text-white/70 hover:text-white underline"
+              className="text-[11px] text-white/70 hover:text-white underline whitespace-nowrap shrink-0"
             >
-              {selectedIds.size === successTasks.length ? 'Снять все' : 'Выбрать все'}
+              {selectedIds.size === successTasks.length ? 'Снять' : 'Все'}
             </button>
           </div>
 
-          <div className="flex items-center gap-1.5">
+          <div className="flex items-center gap-1 sm:gap-1.5 shrink-0">
             {selectedIds.size > 0 && (
               <>
                 <button
@@ -352,11 +408,11 @@ export const ResultsFeed: React.FC<ResultsFeedProps> = ({
                       onDownloadSelected(selectedTasks);
                     }
                   }}
-                  className="inline-flex items-center gap-1 text-xs bg-pure-white text-graphite-ink px-3 py-1.5 rounded-xl font-medium hover:bg-white/90 active:scale-95 transition shadow-xs"
-                  title="Скачать выбранные"
+                  className="inline-flex items-center gap-1 text-xs bg-pure-white text-graphite-ink px-2.5 sm:px-3 py-1.5 rounded-xl font-medium hover:bg-white/90 active:scale-95 transition shadow-xs whitespace-nowrap shrink-0"
+                  title={isMobile ? 'Сохранить в галерею устройства' : 'Скачать выбранные'}
                 >
-                  <Download className="w-3.5 h-3.5" />
-                  <span>{isMobile ? 'В галерею' : 'Скачать'}</span>
+                  <Download className="w-3.5 h-3.5 shrink-0" />
+                  <span className="text-[11px] sm:text-xs">{isMobile ? 'В галерею' : 'Скачать'}</span>
                 </button>
 
                 {onSendSelectedToStudio && (
@@ -364,11 +420,11 @@ export const ResultsFeed: React.FC<ResultsFeedProps> = ({
                     onClick={() => {
                       onSendSelectedToStudio(selectedTasks);
                     }}
-                    className="inline-flex items-center gap-1 text-xs bg-white/20 hover:bg-white/30 text-pure-white px-3 py-1.5 rounded-xl font-medium active:scale-95 transition backdrop-blur-xs"
+                    className="inline-flex items-center gap-1 text-xs bg-white/20 hover:bg-white/30 text-pure-white px-2 sm:px-2.5 py-1.5 rounded-xl font-medium active:scale-95 transition backdrop-blur-xs whitespace-nowrap shrink-0"
                     title="Отправить в студию на новую генерацию"
                   >
-                    <Sparkles className="w-3.5 h-3.5" />
-                    <span>В студию</span>
+                    <Sparkles className="w-3.5 h-3.5 shrink-0" />
+                    <span className="hidden sm:inline text-[11px] sm:text-xs">В студию</span>
                   </button>
                 )}
               </>
@@ -379,7 +435,7 @@ export const ResultsFeed: React.FC<ResultsFeedProps> = ({
                 setSelectionMode(false);
                 setSelectedIds(new Set());
               }}
-              className="p-1.5 text-white/70 hover:text-white rounded-lg hover:bg-white/10 transition"
+              className="p-1.5 text-white/70 hover:text-white rounded-lg hover:bg-white/10 transition shrink-0"
               title="Отмена"
             >
               <X className="w-4 h-4" />
@@ -388,10 +444,11 @@ export const ResultsFeed: React.FC<ResultsFeedProps> = ({
         </div>
       )}
 
-      {/* Shadcn-styled Desktop Context Menu (Request 5) */}
+      {/* Shadcn-styled Desktop / Mobile Context Menu */}
       {contextMenu && (
         <div
-          className="fixed z-50 min-w-[170px] bg-pure-white text-graphite-ink border border-hairline rounded-xl shadow-xl p-1 text-xs animate-in fade-in zoom-in-95 duration-150"
+          id="gallery-context-menu"
+          className="fixed z-50 min-w-[180px] bg-pure-white text-graphite-ink border border-hairline rounded-xl shadow-2xl p-1 text-xs animate-in fade-in zoom-in-95 duration-150 select-none"
           style={{ top: `${contextMenu.y}px`, left: `${contextMenu.x}px` }}
           onClick={(e) => e.stopPropagation()}
         >
@@ -417,7 +474,7 @@ export const ResultsFeed: React.FC<ResultsFeedProps> = ({
             className="w-full flex items-center gap-2 px-2.5 py-1.5 rounded-lg hover:bg-hover-veil transition font-medium text-left"
           >
             <Download className="w-3.5 h-3.5 text-mid-ash" />
-            <span>Скачать</span>
+            <span>{isMobile ? 'В галерею' : 'Скачать'}</span>
           </button>
 
           {onSendSelectedToStudio && (
