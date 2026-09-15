@@ -125,7 +125,7 @@ export const CreationStudio: React.FC<CreationStudioProps> = ({
 
   const handleLaunch = () => {
     const trimmed = promptInput.trim();
-    if (!trimmed || photos.length === 0) return;
+    if (!trimmed) return;
     onStartBatch(trimmed);
     setPromptInput('');
   };
@@ -140,7 +140,7 @@ export const CreationStudio: React.FC<CreationStudioProps> = ({
   const currentRatio =
     ASPECT_RATIOS.find((r) => r.res === settings.resolution) || ASPECT_RATIOS[0];
 
-  const canLaunch = photos.length > 0 && promptInput.trim().length > 0;
+  const canLaunch = promptInput.trim().length > 0;
 
   return (
     <div className="flex flex-col flex-1 h-full min-h-0 overflow-hidden bg-pure-white select-none">
@@ -176,7 +176,7 @@ export const CreationStudio: React.FC<CreationStudioProps> = ({
                 Что хотите создать?
               </h1>
               <p className="text-xs sm:text-sm text-mid-ash leading-relaxed max-w-md">
-                Загрузите фотографии, напишите желаемый стиль в строке ниже и нажмите «Отправить». Каждое фото обработается в качестве 1.5K UHD.
+                Опишите изображение в строке ниже для генерации с нуля или добавьте фото для стилизации.
               </p>
             </div>
 
@@ -421,7 +421,7 @@ export const CreationStudio: React.FC<CreationStudioProps> = ({
               onKeyDown={handleKeyDown}
               placeholder={
                 photos.length === 0
-                  ? 'Сначала выберите фото, затем опишите стиль...'
+                  ? 'Опишите изображение для создания и нажмите Enter...'
                   : `Опишите стиль для ${photos.length} фото и нажмите Enter...`
               }
               className="w-full bg-transparent border-none text-sm text-graphite-ink placeholder:text-mid-ash/70 focus:outline-none focus:ring-0 p-0 resize-none max-h-[125px] leading-relaxed overflow-y-auto block"
@@ -474,10 +474,10 @@ export const CreationStudio: React.FC<CreationStudioProps> = ({
                 disabled={!canLaunch}
                 className="w-8 h-8 rounded-full bg-graphite-ink text-pure-white flex items-center justify-center hover:bg-black disabled:opacity-25 disabled:hover:bg-graphite-ink transition shrink-0 shadow-xs active:scale-95"
                 title={
-                  photos.length === 0
-                    ? 'Сначала добавьте фото'
-                    : !promptInput.trim()
-                    ? 'Введите описание стиля'
+                  !promptInput.trim()
+                    ? 'Введите описание'
+                    : photos.length === 0
+                    ? 'Создать изображение по описанию'
                     : `Запустить генерацию (${photos.length} задач)`
                 }
               >

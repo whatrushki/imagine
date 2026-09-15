@@ -88,11 +88,20 @@ export const QueueTable: React.FC<QueueTableProps> = ({
               }
             }}
           >
-            <img
-              src={activeTask.resultUrl || activeTask.photoDataUrl || ''}
-              alt={activeTask.photoName}
-              className="w-full h-full object-cover transition duration-300 group-hover:scale-102"
-            />
+            {activeTask.resultUrl || activeTask.photoDataUrl ? (
+              <img
+                src={activeTask.resultUrl || activeTask.photoDataUrl || ''}
+                alt={activeTask.photoName}
+                className="w-full h-full object-cover transition duration-300 group-hover:scale-102"
+              />
+            ) : (
+              <div className="w-full h-full flex flex-col items-center justify-center bg-gradient-to-br from-sidebar-mist to-hairline/30 gap-2.5">
+                <div className="w-12 h-12 rounded-2xl bg-pure-white border border-hairline flex items-center justify-center shadow-xs">
+                  <Sparkles className="w-6 h-6 text-graphite-ink animate-pulse" />
+                </div>
+                <p className="text-xs font-medium text-mid-ash">Генерация по текстовому описанию</p>
+              </div>
+            )}
 
             {/* Top glass pill badge */}
             <div className="absolute top-2.5 left-2.5 right-2.5 flex items-center justify-between pointer-events-none">
@@ -325,12 +334,25 @@ export const QueueTable: React.FC<QueueTableProps> = ({
                       }
                     }}
                   >
-                    <img
-                      src={isSuccess ? task.resultUrl! : task.photoDataUrl || ''}
-                      alt={task.photoName}
-                      className="w-full h-full object-cover transition duration-200 group-hover:scale-105"
-                      loading="lazy"
-                    />
+                    {isSuccess && task.resultUrl ? (
+                      <img
+                        src={task.resultUrl}
+                        alt={task.photoName}
+                        className="w-full h-full object-cover transition duration-200 group-hover:scale-105"
+                        loading="lazy"
+                      />
+                    ) : task.photoDataUrl ? (
+                      <img
+                        src={task.photoDataUrl}
+                        alt={task.photoName}
+                        className="w-full h-full object-cover transition duration-200 group-hover:scale-105"
+                        loading="lazy"
+                      />
+                    ) : (
+                      <div className="w-full h-full flex items-center justify-center bg-sidebar-mist text-mid-ash">
+                        <Sparkles className="w-5 h-5 opacity-60" />
+                      </div>
+                    )}
 
                     {/* Overlay status badge */}
                     {isProcessing && (

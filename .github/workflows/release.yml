@@ -84,10 +84,16 @@ jobs:
           java-version: '21'
 
       - name: Setup Android SDK
+        continue-on-error: true
         uses: android-actions/setup-android@v3
+        with:
+          packages: 'platform-tools'
 
       - name: Accept Android Licenses
-        run: yes | sdkmanager --licenses || true
+        run: |
+          export ANDROID_HOME="${ANDROID_HOME:-/usr/local/lib/android/sdk}"
+          export PATH="$ANDROID_HOME/cmdline-tools/latest/bin:$ANDROID_HOME/platform-tools:$PATH"
+          yes | sdkmanager --licenses || true
 
       - name: Checkout Keystore Repository
         continue-on-error: true
@@ -126,7 +132,8 @@ jobs:
       - name: Sign Android APK and Prepare Outputs
         run: |
           mkdir -p output-android
-          BUILD_TOOLS_DIR=$(ls -d $ANDROID_HOME/build-tools/* | sort -V | tail -n 1)
+          ANDROID_DIR="${ANDROID_HOME:-/usr/local/lib/android/sdk}"
+          BUILD_TOOLS_DIR=$(ls -d $ANDROID_DIR/build-tools/* | sort -V | tail -n 1)
           echo "Using Android Build Tools: $BUILD_TOOLS_DIR"
 
           # Locate built unsigned or signed APK

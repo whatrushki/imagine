@@ -325,17 +325,20 @@ export const App: React.FC = () => {
         const currentTask = tasksRef.current.find((t) => t.id === taskId);
         if (!currentTask) continue;
 
-        let photo = sourcePhotosMapRef.current.get(currentTask.photoId);
-        if (!photo) {
-          photo = photosRef.current.find((p) => p.id === currentTask.photoId);
-        }
+        let photo: PhotoItem | undefined = undefined;
+        if (currentTask.photoId) {
+          photo = sourcePhotosMapRef.current.get(currentTask.photoId);
+          if (!photo) {
+            photo = photosRef.current.find((p) => p.id === currentTask.photoId);
+          }
 
-        if (!photo || !photo.file) {
-          updateTaskStatus(taskId, {
-            status: 'error',
-            error: 'Исходный файл фото не найден',
-          });
-          continue;
+          if (!photo || !photo.file) {
+            updateTaskStatus(taskId, {
+              status: 'error',
+              error: 'Исходный файл фото не найден',
+            });
+            continue;
+          }
         }
 
         updateTaskStatus(taskId, {
@@ -349,7 +352,7 @@ export const App: React.FC = () => {
             : settings.seed;
 
           const { resultUrl, duration } = await generateImage(
-            photo.file,
+            photo ? photo.file : null,
             currentTask.promptText,
             settings.resolution,
             seed,
@@ -440,37 +443,53 @@ export const App: React.FC = () => {
     }
   };
 
-  // Launch a new batch: Single prompt + multiple photos immediately sent to queue!
+  // Launch a new batch: Single prompt + multiple photos (or text-to-image if 0 photos) immediately sent to queue!
   const handleStartBatch = async (promptText: string, customPhotos?: PhotoItem[]) => {
     const targetPhotos = customPhotos || photos;
-    if (targetPhotos.length === 0 || !promptText.trim()) return;
-
-    // Cache source photos permanently
-    await saveSourcePhotos(targetPhotos);
-    for (const p of targetPhotos) {
-      sourcePhotosMapRef.current.set(p.id, p);
-    }
+    if (!promptText.trim()) return;
 
     const batchId = `batch_${Date.now()}`;
     const newBatchTasks: MatrixTask[] = [];
     let idx = tasksRef.current.length;
 
-    targetPhotos.forEach((photo) => {
+    if (targetPhotos.length === 0) {
       newBatchTasks.push({
-        id: `${photo.id}_${Date.now()}_${idx}`,
+        id: `t2i_${Date.now()}_${idx}`,
         index: idx,
         batchId,
-        photoId: photo.id,
-        photoName: photo.name,
-        photoDataUrl: photo.dataUrl,
+        photoId: '',
+        photoName: 'Text-to-Image',
+        photoDataUrl: '',
         promptId: `p_${Date.now()}`,
         promptText: promptText.trim(),
         status: 'pending',
         resultUrl: null,
         failCount: 0,
       });
-      idx++;
-    });
+    } else {
+      // Cache source photos permanently
+      await saveSourcePhotos(targetPhotos);
+      for (const p of targetPhotos) {
+        sourcePhotosMapRef.current.set(p.id, p);
+      }
+
+      targetPhotos.forEach((photo) => {
+        newBatchTasks.push({
+          id: `${photo.id}_${Date.now()}_${idx}`,
+          index: idx,
+          batchId,
+          photoId: photo.id,
+          photoName: photo.name,
+          photoDataUrl: photo.dataUrl,
+          promptId: `p_${Date.now()}`,
+          promptText: promptText.trim(),
+          status: 'pending',
+          resultUrl: null,
+          failCount: 0,
+        });
+        idx++;
+      });
+    }
 
     // Append new batch to tasks list without wiping old tasks
     const updatedTasks = [...tasksRef.current, ...newBatchTasks];
@@ -491,7 +510,10 @@ export const App: React.FC = () => {
       id: batchId,
       batchId,
       promptText: promptText.trim(),
-      title: `${newBatchTasks.length} фото • ${promptText.trim().slice(0, 24)}...`,
+      title:
+        targetPhotos.length === 0
+          ? `Текст • ${promptText.trim().slice(0, 28)}...`
+          : `${newBatchTasks.length} фото • ${promptText.trim().slice(0, 24)}...`,
       date: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
       photoCount: newBatchTasks.length,
       promptCount: 1,

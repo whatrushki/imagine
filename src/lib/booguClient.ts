@@ -127,7 +127,7 @@ function extractImageUrl(data: any): string {
 }
 
 export async function generateImage(
-  file: File,
+  file: File | Blob | null | undefined,
   instruction: string,
   resolution = '1536x1536 ( 1:1 )',
   seed = 42,
@@ -142,7 +142,7 @@ export async function generateImage(
     let response: any;
 
     if (instance.server.includes('multimodalart/Boogu-Image')) {
-      // Endpoint on Hugging Face ZeroGPU space: /edit
+      // Endpoint on Hugging Face ZeroGPU space: /edit (handles both text-to-image and image-to-image)
       const is2K =
         resolution.includes('2K') ||
         resolution.includes('2048') ||
@@ -150,7 +150,7 @@ export async function generateImage(
         resolution.includes('1744');
 
       response = await instance.client.predict('/edit', {
-        image: file,
+        image: file || null,
         instruction: instruction,
         model_choice: 'Turbo',
         resolution: is2K ? '2K' : '1K',
