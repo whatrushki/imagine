@@ -14,12 +14,76 @@ export const RESOLUTIONS_1_5K = [
   '2368x992 ( 21:9 )',
 ];
 
+// Intercept browser fetch calls to fix Gradio Client CORS errors on Hugging Face Spaces:
+// 1. Gradio client defaults to `credentials: 'include'`. Hugging Face Space servers do not
+//    return `Access-Control-Allow-Credentials: true` in OPTIONS preflight responses, causing
+//    Chromium to reject cross-origin requests with a CORS error on https://whatrushki.github.io/.
+//    Switching credentials to 'omit' resolves this for all HF endpoints.
+// 2. Gradio client attaches `Content-Type: application/json` to GET /config, forcing an unnecessary
+//    preflight. Stripping Content-Type on GET requests prevents this preflight entirely.
+if (typeof window !== 'undefined' && typeof window.fetch === 'function') {
+  const origFetch = window.fetch.bind(window);
+  window.fetch = async (input: RequestInfo | URL, init?: RequestInit) => {
+    let url = '';
+    if (typeof input === 'string') {
+      url = input;
+    } else if (input instanceof URL) {
+      url = input.toString();
+    } else if (input && typeof (input as Request).url === 'string') {
+      url = (input as Request).url;
+    }
+
+    const isHfOrBoogu =
+      url.includes('hf.space') ||
+      url.includes('huggingface.co') ||
+      url.includes('boogu.org');
+
+    if (isHfOrBoogu) {
+      const opts: RequestInit = init ? { ...init } : {};
+
+      if (opts.credentials === 'include') {
+        opts.credentials = 'omit';
+      }
+
+      const method = (opts.method || (input instanceof Request ? input.method : 'GET')).toUpperCase();
+      if (method === 'GET' && opts.headers) {
+        if (opts.headers instanceof Headers) {
+          opts.headers.delete('content-type');
+        } else if (Array.isArray(opts.headers)) {
+          opts.headers = opts.headers.filter(([k]) => k.toLowerCase() !== 'content-type');
+        } else if (typeof opts.headers === 'object') {
+          delete (opts.headers as Record<string, string>)['content-type'];
+          delete (opts.headers as Record<string, string>)['Content-Type'];
+        }
+      }
+
+      if (input instanceof Request) {
+        const reqInit: RequestInit = {
+          credentials: 'omit',
+        };
+        if (method === 'GET') {
+          const headers = new Headers(input.headers);
+          headers.delete('content-type');
+          reqInit.headers = headers;
+        }
+        input = new Request(input, reqInit);
+      }
+
+      return origFetch(input, opts);
+    }
+
+    return origFetch(input, init);
+  };
+}
+
 // Backend endpoints for Boogu-Image-0.1-Edit-Turbo:
 // 1. multimodalart/Boogu-Image: active, official ZeroGPU space on Hugging Face
-// 2. demo-edit-turbo-1k.boogu.org: official boogu demo (used when up)
-// 3. demo-edit-turbo-1k5.boogu.org: alternative official demo
+// 2. Guaryn/Boogu-Image: running backup ZeroGPU space on Hugging Face
+// 3. demo-edit-turbo-1k.boogu.org: official boogu demo (used when up)
+// 4. demo-edit-turbo-1k5.boogu.org: alternative official demo
 export const SERVERS = [
   'multimodalart/Boogu-Image',
+  'Guaryn/Boogu-Image',
   'https://demo-edit-turbo-1k.boogu.org/',
   'https://demo-edit-turbo-1k5.boogu.org/',
 ];
@@ -141,7 +205,7 @@ export async function generateImage(
   try {
     let response: any;
 
-    if (instance.server.includes('multimodalart/Boogu-Image')) {
+    if (instance.server.includes('Boogu-Image')) {
       // Endpoint on Hugging Face ZeroGPU space: /edit (handles both text-to-image and image-to-image)
       const is2K =
         resolution.includes('2K') ||
